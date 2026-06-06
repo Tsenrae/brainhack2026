@@ -1,21 +1,32 @@
-import { Trophy, Flame, TrendingUp, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, MapPin, Users, Clock } from 'lucide-react';
+import { Flame, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, MapPin, Users, Clock } from 'lucide-react';
 import { Link } from 'react-router';
+import { useAuth } from '../context/AuthContext';
+
+const recentScans = [
+  { type: "WhatsApp Message", result: "Safe", time: "2 hours ago", confidence: 98 },
+  { type: "QR Code", result: "Warning", time: "5 hours ago", confidence: 75 },
+  { type: "Email Link", result: "Safe", time: "1 day ago", confidence: 95 }
+];
+
+const badges = [
+  { icon: "🛡️", name: "First Defense", unlocked: true },
+  { icon: "🎯", name: "Sharp Eye", unlocked: true },
+  { icon: "⚡", name: "Quick Learner", unlocked: true },
+  { icon: "🔥", name: "7-Day Streak", unlocked: true },
+  { icon: "👁️", name: "Deepfake Hunter", unlocked: false },
+  { icon: "🏆", name: "Top 10%", unlocked: false }
+];
 
 export function DashboardHome() {
-  const recentScans = [
-    { type: "WhatsApp Message", result: "Safe", time: "2 hours ago", confidence: 98 },
-    { type: "QR Code", result: "Warning", time: "5 hours ago", confidence: 75 },
-    { type: "Email Link", result: "Safe", time: "1 day ago", confidence: 95 }
-  ];
+  const { profile } = useAuth();
 
-  const badges = [
-    { icon: "🛡️", name: "First Defense", unlocked: true },
-    { icon: "🎯", name: "Sharp Eye", unlocked: true },
-    { icon: "⚡", name: "Quick Learner", unlocked: true },
-    { icon: "🔥", name: "7-Day Streak", unlocked: true },
-    { icon: "👁️", name: "Deepfake Hunter", unlocked: false },
-    { icon: "🏆", name: "Top 10%", unlocked: false }
-  ];
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
+  // current_level_xp and next_level_xp are absolute XP thresholds (floor of each level)
+  const levelRange = profile ? profile.next_level_xp - profile.current_level_xp : 1;
+  const progressPct = profile
+    ? Math.min(100, Math.round(((profile.xp - profile.current_level_xp) / levelRange) * 100))
+    : 0;
+  const xpToNext = profile ? profile.next_level_xp - profile.xp : 0;
 
   return (
     <div className="p-8 space-y-8">
@@ -24,7 +35,9 @@ export function DashboardHome() {
         <div className="flex items-start justify-between">
           <div className="space-y-4 flex-1">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, John! 👋</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {firstName}! 👋
+              </h1>
               <p className="text-gray-600">Ready to protect Singapore's digital space?</p>
             </div>
 
@@ -33,20 +46,27 @@ export function DashboardHome() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white font-bold">
-                    8
+                    {profile?.level ?? '—'}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-700">Level 8</div>
-                    <div className="text-xs text-gray-500">Guardian</div>
+                    <div className="text-sm font-medium text-gray-700">Level {profile?.level ?? '—'}</div>
+                    <div className="text-xs text-gray-500">{profile?.level_title ?? '...'}</div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-gray-900">2,450 / 3,000 XP</div>
-                  <div className="text-xs text-gray-500">550 XP to Level 9</div>
+                  <div className="text-sm font-bold text-gray-900">
+                    {(profile?.xp ?? 0).toLocaleString()} / {(profile?.next_level_xp ?? 0).toLocaleString()} XP
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {xpToNext.toLocaleString()} XP to Level {(profile?.level ?? 0) + 1}
+                  </div>
                 </div>
               </div>
               <div className="w-full bg-red-100 rounded-full h-3">
-                <div className="bg-gradient-to-r from-red-500 to-orange-500 h-3 rounded-full" style={{ width: '82%' }}></div>
+                <div
+                  className="bg-gradient-to-r from-red-500 to-orange-500 h-3 rounded-full transition-all"
+                  style={{ width: `${progressPct}%` }}
+                />
               </div>
             </div>
           </div>
@@ -57,21 +77,23 @@ export function DashboardHome() {
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <Flame className="w-8 h-8 text-orange-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">7</div>
+              <div className="text-2xl font-bold text-gray-900">{profile?.streak_days ?? 0}</div>
               <div className="text-xs text-gray-600">Day Streak</div>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <Target className="w-8 h-8 text-green-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">94%</div>
+              <div className="text-2xl font-bold text-gray-900">
+                {profile ? `${Math.round(profile.accuracy_rate)}%` : '—'}
+              </div>
               <div className="text-xs text-gray-600">Accuracy</div>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <CheckCircle className="w-8 h-8 text-blue-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">12</div>
+              <div className="text-2xl font-bold text-gray-900">{profile?.missions_completed ?? 0}</div>
               <div className="text-xs text-gray-600">Completed</div>
             </div>
           </div>
@@ -199,7 +221,7 @@ export function DashboardHome() {
             </div>
           </Link>
 
-          {/* Shield Squad */}
+          {/* Community Reports */}
           <Link to="/community/submit" className="bg-white rounded-2xl p-6 border border-gray-200 hover:border-red-300 hover:shadow-lg transition-all cursor-pointer group block">
             <div className="flex items-start justify-between mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
