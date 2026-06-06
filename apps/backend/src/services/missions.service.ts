@@ -1,9 +1,9 @@
 import { supabaseAdmin, isMockMode } from '../config/supabase.js';
 import { usersService } from './users.service.js';
+import { badgesService } from './badges.service.js';
 import {
   SPOT_THE_SPIN_QUESTIONS,
   TOTAL_QUESTIONS,
-  MISSION_BADGES,
   MODULE_SLUGS,
   XP_CORRECT,
   XP_WRONG,
@@ -15,7 +15,6 @@ import type {
   MissionStatusResponse,
   QuizSessionResponse,
   AnswerResult,
-  MissionBadge,
   QuizAnswerType,
 } from '../types/mission.types.js';
 
@@ -168,6 +167,7 @@ export const missionsService = {
         session_complete: sessionComplete,
         accuracy_pct: accuracy,
         question,
+        newly_earned_badges: [],
       };
     }
 
@@ -204,6 +204,7 @@ export const missionsService = {
     const updatedProfile = await usersService.awardXp(userId, { amount: xpAwarded });
 
     // On completion: award module completion XP, update profile stats, unlock badge
+    const newlyEarnedBadges: string[] = [];
     if (sessionComplete) {
       await usersService.awardXp(userId, {
         amount: MODULE_COMPLETION_XP['spot-the-spin'],
@@ -212,9 +213,8 @@ export const missionsService = {
 
       await missionsService.incrementMissionsCompleted(userId, accuracy);
 
-      await supabaseAdmin!
-        .from('user_badges')
-        .upsert({ user_id: userId, badge_slug: 'spin-spotter' });
+      const isNew = await badgesService.awardBadge(userId, 'spin-spotter');
+      if (isNew) newlyEarnedBadges.push('spin-spotter');
     }
 
     return {
@@ -229,30 +229,8 @@ export const missionsService = {
       session_complete: sessionComplete,
       accuracy_pct: accuracy,
       question,
+      newly_earned_badges: newlyEarnedBadges,
     };
-  },
-
-  async getBadges(userId: string): Promise<MissionBadge[]> {
-    if (isMockMode) {
-      return MISSION_BADGES.map((b, idx) => ({
-        ...b,
-        earned: idx === 0,
-        earned_at: idx === 0 ? new Date().toISOString() : null,
-      }));
-    }
-
-    const { data } = await supabaseAdmin!
-      .from('user_badges')
-      .select('badge_slug, earned_at')
-      .eq('user_id', userId);
-
-    const earned = new Map((data ?? []).map((r: { badge_slug: string; earned_at: string }) => [r.badge_slug, r.earned_at]));
-
-    return MISSION_BADGES.map(b => ({
-      ...b,
-      earned: earned.has(b.badge_slug),
-      earned_at: earned.get(b.badge_slug) ?? null,
-    }));
   },
 
   async incrementMissionsCompleted(userId: string, moduleAccuracy: number): Promise<void> {

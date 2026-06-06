@@ -78,14 +78,4 @@ export const missionsController = {
     }
   },
 
-  async getBadges(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-      const auth = await extractAuth(req, res);
-      if (!auth) return;
-      const data = await missionsService.getBadges(auth.userId);
-      res.json({ data });
-    } catch (err) {
-      next(err);
-    }
-  },
 };

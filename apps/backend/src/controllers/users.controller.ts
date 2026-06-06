@@ -143,7 +143,7 @@ export const usersController = {
 
   async getByUsername(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { username } = req.params;
+      const username = req.params['username'] as string;
       const profile = await usersService.getProfileByUsername(username);
       if (!profile) {
         res.status(404).json({ error: 'User not found' });

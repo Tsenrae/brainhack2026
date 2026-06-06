@@ -12,5 +12,3 @@ missionsRouter.get('/digital-shield/spot-the-spin/session', missionsController.g
 // Submit an answer and receive feedback + XP result
 missionsRouter.post('/digital-shield/spot-the-spin/answer', missionsController.submitAnswer);
 
-// Badge status for the authenticated user
-missionsRouter.get('/digital-shield/badges', missionsController.getBadges);

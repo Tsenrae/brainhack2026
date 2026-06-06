@@ -27,7 +27,19 @@ interface AnswerResult {
   session_complete: boolean;
   accuracy_pct: number;
   question: QuizQuestion;
+  newly_earned_badges?: string[];
 }
+
+const BADGE_NAMES: Record<string, string> = {
+  'spin-spotter':       'Spin Spotter',
+  'ripple-breaker':     'Ripple Breaker',
+  'truth-guardian':     'Truth Guardian',
+  'squad-strategist':   'Squad Strategist',
+  'deepfake-detective': 'Deepfake Detective',
+  'scam-slayer':        'Scam Slayer',
+  'qr-guardian':        'QR Guardian',
+  'kindness-champion':  'Kindness Champion',
+};
 
 const ANSWER_LABELS: Record<QuizAnswerType, string> = {
   real: 'Real',
@@ -53,7 +65,7 @@ export function QuizFeedback() {
     );
   }
 
-  const { is_correct, correct_answer, user_answer, xp_awarded, new_total_xp, correct_count, wrong_count, next_question_index, session_complete, accuracy_pct, question } = result;
+  const { is_correct, correct_answer, user_answer, xp_awarded, new_total_xp, correct_count, wrong_count, next_question_index, session_complete, accuracy_pct, question, newly_earned_badges = [] } = result;
   const totalAnswered = correct_count + wrong_count;
   const xpPenalty = 50 - xp_awarded;
 
@@ -109,6 +121,24 @@ export function QuizFeedback() {
           </div>
         </div>
       </div>
+
+      {/* Badge unlocked notification */}
+      {newly_earned_badges.length > 0 && session_complete && (
+        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl p-5 flex items-center gap-4 shadow-lg">
+          <div className="w-16 h-16 bg-white/25 rounded-2xl flex items-center justify-center flex-shrink-0 text-3xl">
+            🏅
+          </div>
+          <div className="flex-1">
+            <p className="text-white font-bold text-lg leading-tight">
+              Badge Unlocked!
+            </p>
+            <p className="text-white/90 text-sm">
+              You earned: {newly_earned_badges.map(slug => BADGE_NAMES[slug] ?? slug).join(', ')}
+            </p>
+          </div>
+          <Award className="w-8 h-8 text-white/60 flex-shrink-0" />
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}

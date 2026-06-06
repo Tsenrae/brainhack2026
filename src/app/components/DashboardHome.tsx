@@ -1,4 +1,5 @@
-import { Flame, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, MapPin, Users, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Flame, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, MapPin, Users, Clock, Lock } from 'lucide-react';
 import { Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,17 +9,45 @@ const recentScans = [
   { type: "Email Link", result: "Safe", time: "1 day ago", confidence: 95 }
 ];
 
-const badges = [
-  { icon: "🛡️", name: "First Defense", unlocked: true },
-  { icon: "🎯", name: "Sharp Eye", unlocked: true },
-  { icon: "⚡", name: "Quick Learner", unlocked: true },
-  { icon: "🔥", name: "7-Day Streak", unlocked: true },
-  { icon: "👁️", name: "Deepfake Hunter", unlocked: false },
-  { icon: "🏆", name: "Top 10%", unlocked: false }
-];
+interface BadgeFromApi {
+  badge_slug: string;
+  badge_name: string;
+  description: string;
+  xp_reward: number;
+  earned: boolean;
+}
+
+// Emoji fallback for dashboard mini-grid
+const BADGE_EMOJI: Record<string, string> = {
+  'spin-spotter':       '🎯',
+  'ripple-breaker':     '🔄',
+  'truth-guardian':     '🛡️',
+  'squad-strategist':   '💡',
+  'deepfake-detective': '👁️',
+  'scam-slayer':        '⚔️',
+  'qr-guardian':        '📱',
+  'kindness-champion':  '💖',
+};
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
 export function DashboardHome() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
+  const [apiBadges, setApiBadges] = useState<BadgeFromApi[]>([]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch(`${BACKEND_URL}/api/badges`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setApiBadges(data); })
+      .catch(console.error);
+  }, [session]);
+
+  // Show earned first, then locked; cap to 6 for the mini grid
+  const sortedBadges = [...apiBadges].sort((a, b) => Number(b.earned) - Number(a.earned)).slice(0, 6);
+  const earnedCount = apiBadges.filter(b => b.earned).length;
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
   // current_level_xp and next_level_xp are absolute XP thresholds (floor of each level)
@@ -293,28 +322,38 @@ export function DashboardHome() {
         <div className="bg-white rounded-2xl p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">Badges</h3>
-            <span className="text-sm text-gray-500">4/6</span>
+            <span className="text-sm text-gray-500">
+              {apiBadges.length > 0 ? `${earnedCount}/${apiBadges.length}` : '…'}
+            </span>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {badges.map((badge, index) => (
+            {sortedBadges.map((badge) => (
               <div
-                key={index}
-                className={`aspect-square rounded-xl flex flex-col items-center justify-center p-2 ${
-                  badge.unlocked
+                key={badge.badge_slug}
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center p-2 relative ${
+                  badge.earned
                     ? 'bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200'
                     : 'bg-gray-50 border border-gray-200 opacity-50'
                 }`}
               >
-                <div className="text-3xl mb-1">{badge.icon}</div>
+                {!badge.earned && (
+                  <Lock className="absolute top-1.5 right-1.5 w-3 h-3 text-gray-400" />
+                )}
+                <div className="text-3xl mb-1">
+                  {BADGE_EMOJI[badge.badge_slug] ?? '🏅'}
+                </div>
                 <div className="text-xs text-center font-medium text-gray-700 leading-tight">
-                  {badge.name}
+                  {badge.badge_name}
                 </div>
               </div>
             ))}
           </div>
-          <button className="mt-4 w-full py-2 text-sm text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors">
+          <Link
+            to="/profile"
+            className="mt-4 w-full py-2 text-sm text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors block text-center"
+          >
             View All Badges
-          </button>
+          </Link>
         </div>
       </div>
     </div>

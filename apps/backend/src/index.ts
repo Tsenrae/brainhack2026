@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { usersRouter } from './routes/users.routes.js';
 import { missionsRouter } from './routes/missions.routes.js';
+import { badgesRouter } from './routes/badges.routes.js';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 5000);
@@ -19,6 +20,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/users', usersRouter);
 app.use('/api/missions', missionsRouter);
+app.use('/api/badges', badgesRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

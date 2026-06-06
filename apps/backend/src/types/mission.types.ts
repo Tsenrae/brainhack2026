@@ -64,6 +64,7 @@ export interface AnswerResult {
   session_complete: boolean;
   accuracy_pct: number;
   question: QuizQuestion;
+  newly_earned_badges: string[];
 }
 
 export interface MissionBadge {
