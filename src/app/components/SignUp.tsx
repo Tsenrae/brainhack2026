@@ -1,67 +1,84 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
   Shield, Eye, EyeOff, ArrowRight, CheckCircle,
   Zap, User, Mail, Lock, GraduationCap, ChevronDown,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import type { CreateProfilePayload } from '../context/AuthContext';
 
-const AGE_GROUPS = ['13–15 (Secondary)', '16–18 (JC / Poly)', '19–25 (Young Adult)', '26+ (Adult)'];
+const AGE_GROUPS = ['13–15 (Secondary)', '16–18 (JC / Poly)', '19–25 (Young Adult)', '26+ (Adult)'] as const;
 const SCHOOLS = [
   'Raffles Institution', 'Hwa Chong Institution', 'NUS High School',
   'Temasek Junior College', 'Anglo-Chinese School (Ind)', 'Dunman High School',
   'Victoria Junior College', 'Meridian Secondary School', 'Other / Not applicable',
 ];
 
-type Step = 1 | 2 | 3;
+const AVATAR_OPTIONS: Array<{ color: CreateProfilePayload['avatar_color']; gradient: string }> = [
+  { color: 'red',    gradient: 'from-red-500 to-orange-500' },
+  { color: 'purple', gradient: 'from-purple-500 to-violet-600' },
+  { color: 'blue',   gradient: 'from-blue-500 to-cyan-500' },
+  { color: 'green',  gradient: 'from-green-500 to-emerald-500' },
+  { color: 'pink',   gradient: 'from-pink-500 to-rose-500' },
+];
 
 const PASSWORD_RULES = [
   { label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
-  { label: 'Uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
-  { label: 'Number', test: (p: string) => /[0-9]/.test(p) },
-  { label: 'Special character', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  { label: 'Uppercase letter',       test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'Number',                 test: (p: string) => /[0-9]/.test(p) },
+  { label: 'Special character',      test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ];
+
+type Step = 1 | 2 | 3;
 
 export function SignUp() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(1);
+  const [searchParams] = useSearchParams();
+  const { signUp, createProfile, user } = useAuth();
 
-  // Step 1
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [showPw, setShowPw] = useState(false);
+  // When arriving from Google OAuth (?complete=1), skip account step
+  const isOAuthComplete = searchParams.get('complete') === '1';
+  const [step, setStep] = useState<Step>(isOAuthComplete ? 2 : 1);
+
+  // Step 1 — account details
+  const [name, setName]           = useState(user?.user_metadata?.full_name ?? '');
+  const [email, setEmail]         = useState(user?.email ?? '');
+  const [password, setPassword]   = useState('');
+  const [confirm, setConfirm]     = useState('');
+  const [showPw, setShowPw]       = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // Step 2
-  const [ageGroup, setAgeGroup] = useState('');
-  const [school, setSchool] = useState('');
-  const [username, setUsername] = useState('');
+  // Step 2 — profile details
+  const [ageGroup, setAgeGroup]   = useState('');
+  const [school, setSchool]       = useState('');
+  const [username, setUsername]   = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState<number>(0);
 
-  // Step 3
-  const [agreeTerms, setAgreeTerms] = useState(false);
-  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  // Step 3 — consent
+  const [agreeTerms, setAgreeTerms]         = useState(false);
+  const [agreePrivacy, setAgreePrivacy]     = useState(false);
   const [subscribeUpdates, setSubscribeUpdates] = useState(true);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState('');
+  const [confirmationSent, setConfirmationSent] = useState(false);
 
-  const pwRules = PASSWORD_RULES.map(r => ({ ...r, ok: r.test(password) }));
+  const pwRules    = PASSWORD_RULES.map(r => ({ ...r, ok: r.test(password) }));
   const pwStrength = pwRules.filter(r => r.ok).length;
   const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong'][pwStrength];
   const strengthColor = ['', 'bg-red-500', 'bg-amber-500', 'bg-yellow-400', 'bg-green-500'][pwStrength];
 
   function validateStep1() {
-    if (!name.trim()) return 'Please enter your name.';
-    if (!email.includes('@')) return 'Please enter a valid email.';
-    if (pwStrength < 2) return 'Please choose a stronger password.';
-    if (password !== confirm) return 'Passwords do not match.';
+    if (!name.trim())           return 'Please enter your name.';
+    if (!email.includes('@'))   return 'Please enter a valid email.';
+    if (pwStrength < 2)         return 'Please choose a stronger password.';
+    if (password !== confirm)   return 'Passwords do not match.';
     return '';
   }
 
   function validateStep2() {
-    if (!ageGroup) return 'Please select your age group.';
-    if (!username.trim()) return 'Please choose a username.';
+    if (!ageGroup)              return 'Please select your age group.';
+    if (!username.trim())       return 'Please choose a username.';
     return '';
   }
 
@@ -69,18 +86,58 @@ export function SignUp() {
     const err = step === 1 ? validateStep1() : step === 2 ? validateStep2() : '';
     if (err) { setError(err); return; }
     setError('');
-    setStep((s => s + 1) as () => Step);
+    setStep(s => (s + 1) as Step);
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    if (!agreeTerms || !agreePrivacy) { setError('Please accept the Terms and Privacy Policy.'); return; }
+
+    if (step < 3) { handleNext(); return; }
+
+    if (!agreeTerms || !agreePrivacy) {
+      setError('Please accept the Terms and Privacy Policy.');
+      return;
+    }
     setError('');
     setLoading(true);
-    setTimeout(() => { setLoading(false); navigate('/dashboard'); }, 1400);
+
+    try {
+      let accessToken: string | undefined;
+
+      if (!isOAuthComplete) {
+        const { session } = await signUp(email, password);
+        if (!session) {
+          // Email confirmation is enabled — account created, no session yet.
+          // User must confirm their email before we can create the profile.
+          setConfirmationSent(true);
+          setLoading(false);
+          return;
+        }
+        accessToken = session.access_token;
+      }
+
+      const payload: CreateProfilePayload = {
+        full_name:         name,
+        username,
+        age_group:         ageGroup,
+        school:            school || undefined,
+        avatar_color:      AVATAR_OPTIONS[selectedAvatar].color,
+        subscribe_updates: subscribeUpdates,
+      };
+      await createProfile(payload, accessToken);
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create account.');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const stepLabels = ['Account', 'Profile', 'Confirm'];
+  const stepLabels = isOAuthComplete
+    ? ['Profile', 'Confirm']
+    : ['Account', 'Profile', 'Confirm'];
+
+  const displayStep = isOAuthComplete ? step - 1 : step;
 
   return (
     <div className="min-h-screen flex">
@@ -117,14 +174,13 @@ export function SignUp() {
             </p>
           </div>
 
-          {/* What you get */}
           <div className="space-y-3">
             <p className="text-white/50 text-xs uppercase tracking-widest font-semibold">What you'll get</p>
             {[
-              { icon: '🎓', title: 'Scenario Academy', desc: 'AI video training missions' },
-              { icon: '🏆', title: 'XP & Badges', desc: 'Earn rewards for every mission' },
-              { icon: '🛡️', title: 'Shield Scanner', desc: 'Real-time threat detection tool' },
-              { icon: '👥', title: 'Shield Squad', desc: 'Team up with other defenders' },
+              { icon: '🎓', title: 'Scenario Academy',  desc: 'AI video training missions' },
+              { icon: '🏆', title: 'XP & Badges',       desc: 'Earn rewards for every mission' },
+              { icon: '🛡️', title: 'Shield Scanner',    desc: 'Real-time threat detection tool' },
+              { icon: '👥', title: 'Shield Squad',       desc: 'Team up with other defenders' },
             ].map(({ icon, title, desc }) => (
               <div key={title} className="flex items-center gap-3 bg-white/10 border border-white/15 rounded-xl px-4 py-2.5">
                 <span className="text-lg">{icon}</span>
@@ -151,7 +207,6 @@ export function SignUp() {
       <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
         <div className="w-full max-w-md">
 
-          {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center">
               <Shield className="w-5 h-5 text-white" />
@@ -159,19 +214,37 @@ export function SignUp() {
             <p className="font-black text-gray-900">ShieldVerse</p>
           </div>
 
+          {confirmationSent && (
+            <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              </div>
+              <h2 className="text-gray-900 font-black text-2xl mb-2">Check your email</h2>
+              <p className="text-gray-500 text-sm mb-6">
+                We sent a confirmation link to <span className="font-semibold text-gray-800">{email}</span>.
+                Click it to activate your account, then sign in to complete your profile.
+              </p>
+              <p className="text-xs text-gray-400 mb-5">Didn't receive it? Check your spam folder.</p>
+              <a href="/signin" className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-orange-500 text-white font-bold py-3 px-6 rounded-xl hover:shadow-lg hover:shadow-red-200 transition-all text-sm">
+                <Shield className="w-4 h-4" /> Go to Sign In
+              </a>
+            </div>
+          )}
+
+          {!confirmationSent && (
           <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
             {/* Step indicator */}
             <div className="flex items-center gap-2 mb-7">
               {stepLabels.map((label, i) => {
                 const n = i + 1;
-                const done = step > n;
-                const active = step === n;
+                const done   = displayStep > n;
+                const active = displayStep === n;
                 return (
                   <div key={label} className="flex items-center gap-2 flex-1">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all ${
-                      done ? 'bg-green-500 text-white' :
-                      active ? 'bg-red-600 text-white' :
-                      'bg-gray-100 text-gray-400'
+                      done   ? 'bg-green-500 text-white' :
+                      active ? 'bg-red-600 text-white'   :
+                               'bg-gray-100 text-gray-400'
                     }`}>
                       {done ? <CheckCircle className="w-4 h-4" /> : n}
                     </div>
@@ -193,7 +266,7 @@ export function SignUp() {
               <p className="text-gray-500 text-sm">
                 {step === 1 ? 'Enter your details to get started' :
                  step === 2 ? 'Personalise your ShieldVerse experience' :
-                 'Review and confirm your registration'}
+                              'Review and confirm your registration'}
               </p>
             </div>
 
@@ -204,9 +277,9 @@ export function SignUp() {
               </div>
             )}
 
-            <form onSubmit={step === 3 ? handleSubmit : (e => { e.preventDefault(); handleNext(); })} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
 
-              {/* ── Step 1: Account details ── */}
+              {/* ── Step 1: Account ── */}
               {step === 1 && (
                 <>
                   <div>
@@ -239,8 +312,6 @@ export function SignUp() {
                         {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-
-                    {/* Password strength */}
                     {password && (
                       <div className="mt-2 space-y-1.5">
                         <div className="flex items-center gap-2">
@@ -249,9 +320,9 @@ export function SignUp() {
                               <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= pwStrength ? strengthColor : 'bg-gray-200'}`} />
                             ))}
                           </div>
-                          <span className={`text-xs font-semibold ${
-                            pwStrength === 4 ? 'text-green-600' : pwStrength >= 2 ? 'text-amber-600' : 'text-red-500'
-                          }`}>{strengthLabel}</span>
+                          <span className={`text-xs font-semibold ${pwStrength === 4 ? 'text-green-600' : pwStrength >= 2 ? 'text-amber-600' : 'text-red-500'}`}>
+                            {strengthLabel}
+                          </span>
                         </div>
                         <div className="grid grid-cols-2 gap-1">
                           {pwRules.map(r => (
@@ -274,7 +345,7 @@ export function SignUp() {
                         className={`w-full border rounded-xl pl-10 pr-11 py-3 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
                           confirm && confirm !== password ? 'border-red-300 focus:ring-red-400' :
                           confirm && confirm === password ? 'border-green-300 focus:ring-green-400' :
-                          'border-gray-200 focus:ring-red-500'
+                                                           'border-gray-200 focus:ring-red-500'
                         }`} />
                       <button type="button" onClick={() => setShowConfirm(s => !s)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
@@ -282,7 +353,9 @@ export function SignUp() {
                       </button>
                     </div>
                     {confirm && confirm === password && (
-                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Passwords match</p>
+                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />Passwords match
+                      </p>
                     )}
                   </div>
                 </>
@@ -334,38 +407,33 @@ export function SignUp() {
                     <p className="text-xs text-gray-400 mt-1">Contributes to your school's leaderboard ranking</p>
                   </div>
 
-                  {/* Avatar picker */}
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Choose Avatar</label>
                     <div className="flex gap-2">
-                      {[
-                        { label: 'JD', gradient: 'from-red-500 to-orange-500' },
-                        { label: 'JD', gradient: 'from-purple-500 to-violet-600' },
-                        { label: 'JD', gradient: 'from-blue-500 to-cyan-500' },
-                        { label: 'JD', gradient: 'from-green-500 to-emerald-500' },
-                        { label: 'JD', gradient: 'from-pink-500 to-rose-500' },
-                      ].map((av, i) => (
-                        <div key={i} className={`w-11 h-11 rounded-xl bg-gradient-to-br ${av.gradient} flex items-center justify-center text-white font-bold text-sm cursor-pointer ring-2 ring-offset-2 transition-all ${i === 0 ? 'ring-red-600' : 'ring-transparent hover:ring-gray-300'}`}>
-                          {name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'JD'}
-                        </div>
+                      {AVATAR_OPTIONS.map((av, i) => (
+                        <button key={i} type="button" onClick={() => setSelectedAvatar(i)}
+                          className={`w-11 h-11 rounded-xl bg-gradient-to-br ${av.gradient} flex items-center justify-center text-white font-bold text-sm transition-all ring-2 ring-offset-2 ${
+                            selectedAvatar === i ? 'ring-red-600' : 'ring-transparent hover:ring-gray-300'
+                          }`}>
+                          {name ? name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'JD'}
+                        </button>
                       ))}
                     </div>
                   </div>
                 </>
               )}
 
-              {/* ── Step 3: Confirm ── */}
+              {/* ── Step 3: Confirm ─��� */}
               {step === 3 && (
                 <>
-                  {/* Summary card */}
                   <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 space-y-2 mb-2">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Account Summary</p>
                     {[
-                      { label: 'Name', value: name },
-                      { label: 'Email', value: email },
-                      { label: 'Username', value: `@${username}` },
-                      { label: 'Age Group', value: ageGroup },
-                      { label: 'School', value: school || 'Not specified' },
+                      { label: 'Name',       value: name },
+                      { label: 'Email',      value: isOAuthComplete ? (user?.email ?? '') : email },
+                      { label: 'Username',   value: `@${username}` },
+                      { label: 'Age Group',  value: ageGroup },
+                      { label: 'School',     value: school || 'Not specified' },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex justify-between text-sm">
                         <span className="text-gray-400">{label}</span>
@@ -374,7 +442,6 @@ export function SignUp() {
                     ))}
                   </div>
 
-                  {/* Welcome XP bonus */}
                   <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-2xl p-4 flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
                       <Zap className="w-5 h-5 text-orange-500" />
@@ -385,12 +452,11 @@ export function SignUp() {
                     </div>
                   </div>
 
-                  {/* Consent checkboxes */}
                   <div className="space-y-3 pt-1">
                     {[
-                      { state: agreeTerms, set: setAgreeTerms, label: <>I agree to the <a href="#" className="text-red-600 font-semibold underline">Terms of Service</a></>, required: true },
-                      { state: agreePrivacy, set: setAgreePrivacy, label: <>I have read the <a href="#" className="text-red-600 font-semibold underline">Privacy Policy</a></>, required: true },
-                      { state: subscribeUpdates, set: setSubscribeUpdates, label: 'Send me mission updates and platform news', required: false },
+                      { state: agreeTerms,        set: setAgreeTerms,        label: <>I agree to the <a href="#" className="text-red-600 font-semibold underline">Terms of Service</a></>,     required: true },
+                      { state: agreePrivacy,       set: setAgreePrivacy,      label: <>I have read the <a href="#" className="text-red-600 font-semibold underline">Privacy Policy</a></>,      required: true },
+                      { state: subscribeUpdates,   set: setSubscribeUpdates,  label: 'Send me mission updates and platform news',                                                                required: false },
                     ].map(({ state, set, label, required }, i) => (
                       <div key={i} className="flex items-start gap-3">
                         <button type="button" onClick={() => set(s => !s)}
@@ -400,8 +466,7 @@ export function SignUp() {
                           {state && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                         </button>
                         <span className="text-sm text-gray-600 leading-snug">
-                          {label}
-                          {required && <span className="text-red-500 ml-0.5">*</span>}
+                          {label}{required && <span className="text-red-500 ml-0.5">*</span>}
                         </span>
                       </div>
                     ))}
@@ -409,9 +474,9 @@ export function SignUp() {
                 </>
               )}
 
-              {/* Navigation buttons */}
-              <div className={`flex gap-3 pt-2 ${step > 1 ? '' : ''}`}>
-                {step > 1 && (
+              {/* Navigation */}
+              <div className="flex gap-3 pt-2">
+                {step > 1 && !isOAuthComplete && (
                   <button type="button" onClick={() => { setStep(s => (s - 1) as Step); setError(''); }}
                     className="flex-1 py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm">
                     Back
@@ -437,9 +502,10 @@ export function SignUp() {
               </Link>
             </p>
           </div>
+          )}
 
           <p className="text-center text-xs text-gray-400 mt-6">
-            Free forever · No credit card required · Made for Singapore 🇸🇬
+            Free forever · No credit card required · Made for Singapore ��🇬
           </p>
         </div>
       </div>
