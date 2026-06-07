@@ -1,21 +1,61 @@
-import { Trophy, Flame, TrendingUp, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, MapPin, Users, Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Flame, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, MapPin, Users, Clock, Lock } from 'lucide-react';
 import { Link } from 'react-router';
+import { useAuth } from '../context/AuthContext';
+
+const recentScans = [
+  { type: "WhatsApp Message", result: "Safe", time: "2 hours ago", confidence: 98 },
+  { type: "QR Code", result: "Warning", time: "5 hours ago", confidence: 75 },
+  { type: "Email Link", result: "Safe", time: "1 day ago", confidence: 95 }
+];
+
+interface BadgeFromApi {
+  badge_slug: string;
+  badge_name: string;
+  description: string;
+  xp_reward: number;
+  earned: boolean;
+}
+
+// Emoji fallback for dashboard mini-grid
+const BADGE_EMOJI: Record<string, string> = {
+  'spin-spotter':       '🎯',
+  'ripple-breaker':     '🔄',
+  'truth-guardian':     '🛡️',
+  'squad-strategist':   '💡',
+  'deepfake-detective': '👁️',
+  'scam-slayer':        '⚔️',
+  'qr-guardian':        '📱',
+  'kindness-champion':  '💖',
+};
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
 export function DashboardHome() {
-  const recentScans = [
-    { type: "WhatsApp Message", result: "Safe", time: "2 hours ago", confidence: 98 },
-    { type: "QR Code", result: "Warning", time: "5 hours ago", confidence: 75 },
-    { type: "Email Link", result: "Safe", time: "1 day ago", confidence: 95 }
-  ];
+  const { profile, session } = useAuth();
+  const [apiBadges, setApiBadges] = useState<BadgeFromApi[]>([]);
 
-  const badges = [
-    { icon: "🛡️", name: "First Defense", unlocked: true },
-    { icon: "🎯", name: "Sharp Eye", unlocked: true },
-    { icon: "⚡", name: "Quick Learner", unlocked: true },
-    { icon: "🔥", name: "7-Day Streak", unlocked: true },
-    { icon: "👁️", name: "Deepfake Hunter", unlocked: false },
-    { icon: "🏆", name: "Top 10%", unlocked: false }
-  ];
+  useEffect(() => {
+    if (!session) return;
+    fetch(`${BACKEND_URL}/api/badges`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setApiBadges(data); })
+      .catch(console.error);
+  }, [session]);
+
+  // Show earned first, then locked; cap to 6 for the mini grid
+  const sortedBadges = [...apiBadges].sort((a, b) => Number(b.earned) - Number(a.earned)).slice(0, 6);
+  const earnedCount = apiBadges.filter(b => b.earned).length;
+
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
+  // current_level_xp and next_level_xp are absolute XP thresholds (floor of each level)
+  const levelRange = profile ? profile.next_level_xp - profile.current_level_xp : 1;
+  const progressPct = profile
+    ? Math.min(100, Math.round(((profile.xp - profile.current_level_xp) / levelRange) * 100))
+    : 0;
+  const xpToNext = profile ? profile.next_level_xp - profile.xp : 0;
 
   return (
     <div className="p-8 space-y-8">
@@ -24,7 +64,9 @@ export function DashboardHome() {
         <div className="flex items-start justify-between">
           <div className="space-y-4 flex-1">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, John! 👋</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Welcome back, {firstName}! 👋
+              </h1>
               <p className="text-gray-600">Ready to protect Singapore's digital space?</p>
             </div>
 
@@ -33,20 +75,27 @@ export function DashboardHome() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center text-white font-bold">
-                    8
+                    {profile?.level ?? '—'}
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-700">Level 8</div>
-                    <div className="text-xs text-gray-500">Guardian</div>
+                    <div className="text-sm font-medium text-gray-700">Level {profile?.level ?? '—'}</div>
+                    <div className="text-xs text-gray-500">{profile?.level_title ?? '...'}</div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-gray-900">2,450 / 3,000 XP</div>
-                  <div className="text-xs text-gray-500">550 XP to Level 9</div>
+                  <div className="text-sm font-bold text-gray-900">
+                    {(profile?.xp ?? 0).toLocaleString()} / {(profile?.next_level_xp ?? 0).toLocaleString()} XP
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {xpToNext.toLocaleString()} XP to Level {(profile?.level ?? 0) + 1}
+                  </div>
                 </div>
               </div>
               <div className="w-full bg-red-100 rounded-full h-3">
-                <div className="bg-gradient-to-r from-red-500 to-orange-500 h-3 rounded-full" style={{ width: '82%' }}></div>
+                <div
+                  className="bg-gradient-to-r from-red-500 to-orange-500 h-3 rounded-full transition-all"
+                  style={{ width: `${progressPct}%` }}
+                />
               </div>
             </div>
           </div>
@@ -57,21 +106,23 @@ export function DashboardHome() {
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <Flame className="w-8 h-8 text-orange-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">7</div>
+              <div className="text-2xl font-bold text-gray-900">{profile?.streak_days ?? 0}</div>
               <div className="text-xs text-gray-600">Day Streak</div>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <Target className="w-8 h-8 text-green-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">94%</div>
+              <div className="text-2xl font-bold text-gray-900">
+                {profile ? `${Math.round(profile.accuracy_rate)}%` : '—'}
+              </div>
               <div className="text-xs text-gray-600">Accuracy</div>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <CheckCircle className="w-8 h-8 text-blue-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">12</div>
+              <div className="text-2xl font-bold text-gray-900">{profile?.missions_completed ?? 0}</div>
               <div className="text-xs text-gray-600">Completed</div>
             </div>
           </div>
@@ -199,7 +250,7 @@ export function DashboardHome() {
             </div>
           </Link>
 
-          {/* Shield Squad */}
+          {/* Community Reports */}
           <Link to="/community/submit" className="bg-white rounded-2xl p-6 border border-gray-200 hover:border-red-300 hover:shadow-lg transition-all cursor-pointer group block">
             <div className="flex items-start justify-between mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -271,28 +322,38 @@ export function DashboardHome() {
         <div className="bg-white rounded-2xl p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">Badges</h3>
-            <span className="text-sm text-gray-500">4/6</span>
+            <span className="text-sm text-gray-500">
+              {apiBadges.length > 0 ? `${earnedCount}/${apiBadges.length}` : '…'}
+            </span>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {badges.map((badge, index) => (
+            {sortedBadges.map((badge) => (
               <div
-                key={index}
-                className={`aspect-square rounded-xl flex flex-col items-center justify-center p-2 ${
-                  badge.unlocked
+                key={badge.badge_slug}
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center p-2 relative ${
+                  badge.earned
                     ? 'bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200'
                     : 'bg-gray-50 border border-gray-200 opacity-50'
                 }`}
               >
-                <div className="text-3xl mb-1">{badge.icon}</div>
+                {!badge.earned && (
+                  <Lock className="absolute top-1.5 right-1.5 w-3 h-3 text-gray-400" />
+                )}
+                <div className="text-3xl mb-1">
+                  {BADGE_EMOJI[badge.badge_slug] ?? '🏅'}
+                </div>
                 <div className="text-xs text-center font-medium text-gray-700 leading-tight">
-                  {badge.name}
+                  {badge.badge_name}
                 </div>
               </div>
             ))}
           </div>
-          <button className="mt-4 w-full py-2 text-sm text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors">
+          <Link
+            to="/profile"
+            className="mt-4 w-full py-2 text-sm text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors block text-center"
+          >
             View All Badges
-          </button>
+          </Link>
         </div>
       </div>
     </div>

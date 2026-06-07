@@ -1,7 +1,23 @@
 import { Bell, Search, Settings, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router';
+import { useAuth } from '../context/AuthContext';
+
+const AVATAR_GRADIENTS: Record<string, string> = {
+  red: 'from-red-500 to-orange-500',
+  purple: 'from-purple-500 to-pink-500',
+  blue: 'from-blue-500 to-cyan-500',
+  green: 'from-green-500 to-emerald-500',
+  pink: 'from-pink-500 to-rose-500',
+};
 
 export function TopBar() {
+  const { profile } = useAuth();
+
+  const initials = profile?.full_name
+    ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+  const gradient = AVATAR_GRADIENTS[profile?.avatar_color ?? 'red'];
+
   return (
     <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between sticky top-0 z-40">
       {/* Search */}
@@ -42,11 +58,13 @@ export function TopBar() {
         {/* User Avatar */}
         <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
           <div className="text-right">
-            <div className="text-sm font-medium text-gray-900">John Doe</div>
-            <div className="text-xs text-gray-500">Level 8 • Guardian</div>
+            <div className="text-sm font-medium text-gray-900">{profile?.full_name ?? '...'}</div>
+            <div className="text-xs text-gray-500">
+              Level {profile?.level ?? '—'} • {profile?.level_title ?? '...'}
+            </div>
           </div>
-          <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer ring-2 ring-red-100">
-            JD
+          <div className={`w-10 h-10 bg-gradient-to-br ${gradient} rounded-full flex items-center justify-center text-white font-bold cursor-pointer ring-2 ring-red-100`}>
+            {initials}
           </div>
         </div>
       </div>
