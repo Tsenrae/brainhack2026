@@ -21,6 +21,7 @@ export function Sidebar() {
     { icon: HeadphonesIcon, label: 'Support', path: '/support/cyberbullying' },
     { icon: Users, label: 'Community', path: '/community/submit' },
     { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },
+    { icon: Users, label: 'Squads', path: '/squads' },
     { icon: User, label: 'Profile', path: '/profile' },
     { icon: BarChart2, label: 'Analytics', path: '/admin/analytics' },
     { icon: Film, label: 'Video Studio', path: '/admin/video-studio' }

@@ -15,6 +15,7 @@ import { TelegramBot } from './components/TelegramBot';
 import { GuardianHeatmap } from './components/GuardianHeatmap';
 import { UserProfile } from './components/UserProfile';
 import { Leaderboard } from './components/Leaderboard';
+import { SquadsHub } from './components/SquadsHub';
 import { AdminAnalytics } from './components/AdminAnalytics';
 import { AdminVideoStudio } from './components/AdminVideoStudio';
 import { ScenarioAcademy } from './components/ScenarioAcademy';
@@ -194,6 +195,17 @@ export default function App() {
               <TopBar />
               <main className="flex-1 overflow-y-auto">
                 <Leaderboard />
+              </main>
+            </div>
+          </div>
+        } />
+        <Route path="/squads" element={
+          <div className="flex h-screen bg-gray-50 overflow-hidden">
+            <Sidebar />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <TopBar />
+              <main className="flex-1 overflow-y-auto">
+                <SquadsHub />
               </main>
             </div>
           </div>
