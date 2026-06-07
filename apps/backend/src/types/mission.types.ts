@@ -1,5 +1,6 @@
 export type QuizAnswerType = 'real' | 'misleading' | 'satire' | 'scam';
 export type ModuleStatus = 'not_started' | 'in_progress' | 'completed';
+export type QuestionType = 'post' | 'video';
 
 export interface RedFlag {
   text: string;
@@ -15,10 +16,17 @@ export interface ManipulationTactic {
 
 export interface QuizQuestion {
   id: number;
+  question_type: QuestionType;
+  // Post fields (empty strings for video questions)
   content: string;
   likes: string;
   shares: string;
   comments: string;
+  // Video fields (only set when question_type === 'video')
+  video_url?: string;
+  video_title?: string;
+  video_description?: string;
+  // Common
   hint: string;
   correct_answer: QuizAnswerType;
   explanation: string;

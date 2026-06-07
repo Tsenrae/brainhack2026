@@ -1,0 +1,102 @@
+================================================================================
+MODULE 1 — SPOT THE SPIN
+Video Scenario #1: CPF Phone Impersonation Scam
+Target Question Index: 1 (second question in the 10-question set)
+Correct Answer: SCAM
+Duration: ~60–90 seconds
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+SCENE DESCRIPTION
+────────────────────────────────────────────────────────────────────────────────
+Setting: A modern Singapore HDB living room, mid-afternoon.
+The protagonist — a young Chinese Singaporean man in his late 20s, dressed
+casually in a polo shirt — is sitting on a sofa, scrolling on his phone.
+
+The phone rings. Unknown number: "+65 6xxx xxxx"
+He answers, looking mildly curious.
+
+────────────────────────────────────────────────────────────────────────────────
+FULL DIALOGUE SCRIPT
+────────────────────────────────────────────────────────────────────────────────
+
+[PHONE — MALE CALLER, authoritative voice, slight formal accent]
+CALLER: "Good afternoon. Am I speaking with [pause] Mr Lim Wei Jian?"
+
+PROTAGONIST: "Uh… yes, who's this?"
+
+CALLER: "This is Officer Tan from the CPF Board Operations Centre, Badge
+Number 4271. Mr Lim, we have detected suspicious transactions on your CPF
+account totalling forty-seven thousand, five hundred dollars. These were
+flagged as potentially linked to a money laundering syndicate."
+
+PROTAGONIST: [sitting up straight, expression shifts to alarm]
+"Wait, what? That doesn't sound right…"
+
+CALLER: "Mr Lim, I understand this is alarming. For your protection, we are
+initiating an immediate account freeze procedure. To complete this, I will
+need to verify your identity — please confirm your NRIC number and your
+SingPass login credentials."
+
+PROTAGONIST: [hesitating, voice lowers]
+"My… my SingPass password? Is this really CPF calling?"
+
+CALLER: "Sir, this is a time-sensitive matter. Every minute your account
+remains active, the fraudulent transactions continue. If you do not cooperate
+now, CPF will not be liable for any further losses. Do you want to protect
+your retirement funds?"
+
+PROTAGONIST: [visible anxiety, fingers hovering over phone]
+
+[FREEZE FRAME — on-screen text appears:]
+
+  "Would you give your SingPass password to this caller?"
+
+[End of video]
+
+────────────────────────────────────────────────────────────────────────────────
+VISUAL DIRECTION NOTES
+────────────────────────────────────────────────────────────────────────────────
+- Camera starts wide on the living room, cuts to medium shot when phone rings
+- Close-up on the protagonist's face as concern grows
+- Show a brief on-screen graphic of an incoming call UI (realistic Singapore
+  number format) when the phone rings
+- On "forty-seven thousand, five hundred dollars" — flash a graphic of a CPF
+  statement mock-up showing a suspicious transaction row (blurred name)
+- When caller says "SingPass credentials" — cut to a brief close-up on the
+  protagonist's face showing confusion/doubt
+- Freeze frame is held for 3 seconds; no music; slight vignette effect
+- Colour grade: slightly warm/natural. No dramatic music until freeze frame
+  (then a single low piano note to signal danger)
+
+────────────────────────────────────────────────────────────────────────────────
+RED FLAGS TO HIGHLIGHT (for quiz feedback screen)
+────────────────────────────────────────────────────────────────────────────────
+1. Request for SingPass password over the phone — CPF NEVER asks for this
+2. Unverifiable badge number — anyone can claim a badge number
+3. Threat of liability if you don't comply — real agencies don't threaten victims
+4. Time pressure to prevent verification — designed to stop you calling CPF directly
+
+────────────────────────────────────────────────────────────────────────────────
+AI VIDEO GENERATION PROMPT
+(for tools like Sora, Runway ML Gen-3, Pika Labs, HeyGen, Kling)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT:
+A short realistic dramatic video set in a Singapore HDB apartment living room,
+afternoon lighting. A young Asian man in his late 20s (polo shirt, casual)
+sits on a sofa and receives an unexpected phone call. His expression shifts
+from relaxed to alarmed as he listens to the caller. The room is a realistic
+Singaporean home — laminated wood floors, Ikea-style furniture, HDB windows.
+The call is from an off-screen voice claiming to be a "CPF Board officer" about
+suspicious transactions. As the caller demands his SingPass password, the
+protagonist looks visibly confused and anxious. Cut to a freeze frame on his
+face with overlaid text: "Would you give your SingPass password to this caller?"
+Cinematic, realistic, no fantasy elements. Duration: 60–90 seconds.
+
+STYLE: Realistic drama, cinematic colour grade, handheld camera feel, shallow
+depth of field on close-ups. Inspired by Singaporean public education films.
+
+ASPECT RATIO: 16:9 (landscape, suitable for quiz embed)
+LANGUAGE: Subtitles in English for all spoken dialogue.
+================================================================================

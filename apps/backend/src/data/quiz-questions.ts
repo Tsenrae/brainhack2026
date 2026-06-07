@@ -1,8 +1,13 @@
 import type { QuizQuestion } from '../types/mission.types.js';
 
+// 10 questions for Module 1: Spot the Spin
+// Layout: 7 social-media post questions + 3 video scenario questions
+// Video positions: index 1, 5, 8  (evenly distributed across the set)
 export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
+  // ── Q0 ── post / scam ────────────────────────────────────────────────────────
   {
     id: 1,
+    question_type: 'post',
     content:
       '🚨 BREAKING: Singapore government announces FREE cash handout of $5,000 to all citizens! Click link to claim NOW before slots run out! Limited time only! 💰💸',
     likes: '12.5K',
@@ -25,31 +30,40 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
       { name: 'Unrealistic Promises', description: 'Offers too-good-to-be-true financial rewards', examples: ['FREE cash handout of $5,000'] },
     ],
   },
+
+  // ── Q1 ── VIDEO / scam ───────────────────────────────────────────────────────
   {
     id: 2,
-    content:
-      '⚠️ Important Notice: Your CPF account has been flagged for suspicious activity. Your withdrawal privileges will be suspended in 24 hours. Verify your identity immediately at: cpf-verify-sg.com',
-    likes: '2.1K',
-    shares: '4.7K',
-    comments: '892',
+    question_type: 'video',
+    content: 'Watch the video below, then answer: what type of content is this?',
+    likes: '',
+    shares: '',
+    comments: '',
+    video_url: '',
+    video_title: 'Incoming Call: "CPF Board Officer" About Suspicious Transactions',
+    video_description:
+      'A young man receives an unexpected call from an "Officer from the CPF Board Operations Centre" who informs him that $47,500 in suspicious transactions have been detected on his CPF account. The officer says his funds must be immediately transferred to a "CPF Safe Account" to prevent further losses — and asks him to confirm his NRIC and SingPass password to freeze the fraudulent activity.',
     correct_answer: 'scam',
     hint:
-      'Official CPF communications come from cpf.gov.sg only. Check the URL in the post — does it end in .gov.sg?',
+      'No government agency — including CPF — will ever ask for your SingPass password or request you to transfer money over a phone call. Any call asking for credentials or fund transfers is a scam.',
     explanation:
-      'This is a phishing scam impersonating CPF. The URL "cpf-verify-sg.com" is not a government domain. CPF only communicates through cpf.gov.sg, official letters, and the CPF mobile app. The 24-hour deadline is a classic pressure tactic.',
+      'This is a government impersonation scam (commonly called a "CPF Safe Account scam"). Real CPF officers never ask for your SingPass password, NRIC over the phone for "verification", or request fund transfers. The tactic relies on fear of financial loss and authority pressure. If you receive such a call, hang up and call CPF directly at 1800-227-1188 to verify.',
     red_flags: [
-      { text: 'cpf-verify-sg.com', explanation: 'Not a government domain — real CPF links end in cpf.gov.sg', severity: 'high' },
-      { text: 'suspended in 24 hours', explanation: '24-hour deadline creates panic to prevent careful verification', severity: 'high' },
-      { text: 'Verify your identity immediately', explanation: 'Urgent directive to click a fraudulent link', severity: 'high' },
+      { text: 'Transfer to a "CPF Safe Account"', explanation: 'No such account exists — this is a tactic to steal your savings', severity: 'high' },
+      { text: 'Confirm your SingPass password', explanation: 'No legitimate agency ever asks for passwords over the phone', severity: 'high' },
+      { text: 'Immediate action required', explanation: 'Urgency is designed to prevent you from calling the real CPF to verify', severity: 'high' },
     ],
     manipulation_tactics: [
-      { name: 'Authority Spoofing', description: 'Mimics official government agency branding and tone', examples: ['CPF account', 'Important Notice'] },
-      { name: 'Fear Induction', description: 'Threatens loss of access to create panic', examples: ['suspended', 'flagged for suspicious activity'] },
-      { name: 'Deadline Pressure', description: 'Forces immediate action within a tight window', examples: ['24 hours', 'immediately'] },
+      { name: 'Authority Impersonation', description: 'Poses as a government officer to gain immediate trust and compliance', examples: ['CPF Board Operations Centre', 'Officer Badge Number'] },
+      { name: 'Fear Induction', description: 'Triggers panic about financial loss to override careful thinking', examples: ['$47,500 in suspicious transactions', 'identity theft'] },
+      { name: 'Urgency Pressure', description: 'Demands immediate action to prevent the target from verifying', examples: ['transfer immediately', 'freeze the activity now'] },
     ],
   },
+
+  // ── Q2 ── post / misleading ──────────────────────────────────────────────────
   {
     id: 3,
+    question_type: 'post',
     content:
       'New survey reveals 99% of Singaporeans want the government to increase cash rebates by 500%. Citizens are "deeply unhappy" with current policies, says unnamed political analyst.',
     likes: '5.3K',
@@ -57,11 +71,11 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     comments: '2.2K',
     correct_answer: 'misleading',
     hint:
-      'Who conducted this survey? How many people were surveyed? Who is the "unnamed analyst"? Real surveys cite methodology and sample size.',
+      'Who conducted this survey? How many people were surveyed? Who is the "unnamed analyst"? Real surveys always cite methodology, sample size, and the institution that ran them.',
     explanation:
-      'This is misleading content. The 99% figure has no sourcing — no survey name, no methodology, no sample size. "Unnamed political analyst" is not a credible citation. Statistics this extreme without a verifiable source are a red flag for manipulated or fabricated data.',
+      'This is misleading content. The 99% figure has no sourcing — no survey name, methodology, or sample size. "Unnamed political analyst" is not a credible citation. Statistics this extreme without a verifiable source are a red flag for fabricated or heavily manipulated data.',
     red_flags: [
-      { text: '99% of Singaporeans', explanation: 'Suspiciously round, extreme number with no citation', severity: 'high' },
+      { text: '99% of Singaporeans', explanation: 'Suspiciously extreme number with zero citation', severity: 'high' },
       { text: 'unnamed political analyst', explanation: 'Anonymous sources cannot be verified or challenged', severity: 'high' },
       { text: '"deeply unhappy"', explanation: 'Emotional framing with no supporting evidence', severity: 'medium' },
     ],
@@ -70,8 +84,11 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
       { name: 'Anonymous Authority', description: 'Cites experts who cannot be held accountable', examples: ['unnamed political analyst'] },
     ],
   },
+
+  // ── Q3 ── post / satire ──────────────────────────────────────────────────────
   {
     id: 4,
+    question_type: 'post',
     content:
       '📰 The Onion SG: "Government to mandate that all HDB flats install mandatory AI mood sensors to detect unhappy residents and deploy happiness drones." — New Smart Nation initiative announced.',
     likes: '18.9K',
@@ -79,14 +96,17 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     comments: '4.6K',
     correct_answer: 'satire',
     hint:
-      'Look for absurd premises and the source of the post. Is this a parody publication?',
+      'Look at the source name and the absurdity of the premise. Is this content from a known parody publication?',
     explanation:
-      'This is satire. The Onion SG is a satirical publication known for exaggerated, fictional "news" about Singapore. Happiness drones and mood sensors are intentionally absurd. Satire uses humour and exaggeration to comment on society — it is not meant to be taken literally.',
+      'This is satire. The Onion SG is a satirical publication known for exaggerated, fictional news about Singapore. Happiness drones and AI mood sensors are intentionally absurd. Satire uses humour and exaggeration to comment on society — it is not meant to be taken literally, even when it mimics a real news format.',
     red_flags: [],
     manipulation_tactics: [],
   },
+
+  // ── Q4 ── post / real ────────────────────────────────────────────────────────
   {
     id: 5,
+    question_type: 'post',
     content:
       '🦟 NEA Alert: A new dengue cluster has been identified in Tampines Street 45. Residents are advised to remove stagnant water from flower pots, pails, and roof gutters. Check NEA\'s myENV app for updates.',
     likes: '3.2K',
@@ -94,58 +114,71 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     comments: '1.1K',
     correct_answer: 'real',
     hint:
-      'Does this look like an official advisory with specific, actionable advice and a reference to a verifiable government source?',
+      'Does this look like an official advisory with a specific location, practical actionable steps, and a reference to a verifiable government source you can independently check?',
     explanation:
-      'This is real, accurate public health information. NEA regularly publishes dengue cluster alerts with precise locations and practical prevention steps. The reference to the official myENV app for verification is consistent with genuine NEA communications.',
+      'This is real, accurate public health information. NEA regularly publishes dengue cluster alerts with precise locations and practical prevention steps. The reference to the official myENV app for verification is consistent with genuine NEA communications. Notice the absence of urgency, fear-mongering, or suspicious links.',
     red_flags: [],
     manipulation_tactics: [],
   },
+
+  // ── Q5 ── VIDEO / misleading ─────────────────────────────────────────────────
   {
     id: 6,
-    content:
-      'LEAKED: Internal documents show Singapore ERP gantry rates will TRIPLE next month affecting ALL expressways. Government hiding this from public! Share before they delete this post! 🚗💸',
-    likes: '7.4K',
-    shares: '15.6K',
-    comments: '5.8K',
+    question_type: 'video',
+    content: 'Watch the video below, then answer: what type of content is this?',
+    likes: '',
+    shares: '',
+    comments: '',
+    video_url: '',
+    video_title: 'VIRAL: "Ministry of Finance" Announces $1,500 Recovery Package for All Singaporeans',
+    video_description:
+      'A smartly-dressed person sits at a professional-looking desk with a Singapore flag visible in the background. Speaking in an authoritative tone, they introduce themselves as representing the Ministry of Finance and announce a "$1,500 Singapore Recovery Assistance Package" available to all eligible Singaporeans. The video shows an official-looking graphic and asks viewers to visit a link to claim their payment — but warns that slots are limited and the offer closes in 48 hours.',
     correct_answer: 'misleading',
     hint:
-      'ERP rate changes are always announced publicly through the LTA website. Has there been any official statement? What does "leaked internal documents" mean with no link or attachment?',
+      'Real government grants are announced on official government websites like mof.gov.sg and budget.gov.sg — never via viral videos with countdown timers. Check: does the URL shown end in .gov.sg?',
     explanation:
-      'This is misleading content. ERP rate changes require public announcement by LTA with adequate notice — they cannot be secretly tripled. The phrase "share before they delete this" is a classic viral manipulation tactic. No leaked document is attached or cited.',
+      'This is misleading content — specifically a government impersonation video. The URL shown (sg-recovery-gov.xyz) is not a government domain. Real Ministry of Finance announcements appear on mof.gov.sg and are reported by CNA, The Straits Times, and other mainstream media. The artificial 48-hour deadline and "limited slots" language are classic manipulation tactics not used in legitimate government communications.',
     red_flags: [
-      { text: 'LEAKED: Internal documents', explanation: 'Unverifiable source designed to add false credibility', severity: 'high' },
-      { text: 'Government hiding this from public', explanation: 'Conspiracy framing to make the content feel like forbidden knowledge', severity: 'high' },
-      { text: 'Share before they delete this post!', explanation: 'Urgency tactic to trigger sharing before fact-checking', severity: 'high' },
+      { text: 'sg-recovery-gov.xyz', explanation: 'Not a .gov.sg domain — legitimate Singapore government sites always end in .gov.sg', severity: 'high' },
+      { text: 'slots are filling up fast', explanation: 'Government entitlements do not have "limited slots" — this creates false urgency', severity: 'high' },
+      { text: 'Prepare your SingPass credentials', explanation: 'A video requesting SingPass credentials is always a red flag — never share these', severity: 'high' },
     ],
     manipulation_tactics: [
-      { name: 'Conspiracy Framing', description: 'Positions the claim as secret information being suppressed', examples: ['Government hiding this', 'leaked documents'] },
-      { name: 'Viral Seeding', description: 'Instructs readers to share before the content is supposedly removed', examples: ['Share before they delete this'] },
+      { name: 'Authority Impersonation', description: 'Uses professional staging (office, flag, business attire) to mimic official government communications', examples: ['Ministry of Finance', 'official-looking seal and graphics'] },
+      { name: 'Urgency & Scarcity', description: 'Combines a tight deadline with limited availability to rush victims into acting without verifying', examples: ['closes in 48 hours', 'slots are filling up fast'] },
+      { name: 'Credential Harvesting', description: 'Asks for sensitive login details under the guise of an official verification process', examples: ['SingPass credentials', 'NRIC and bank account details'] },
     ],
   },
+
+  // ── Q6 ── post / scam ────────────────────────────────────────────────────────
   {
     id: 7,
+    question_type: 'post',
     content:
-      '🚨 URGENT: Grab is giving FREE rides all weekend to celebrate 10M users! Claim your 5 FREE rides now — valid this weekend only! Click here to activate: grab-rewards-sg.net 🚗',
-    likes: '21.4K',
-    shares: '33.7K',
-    comments: '8.9K',
+      '🌟 HIRING NOW! Work from home, earn $300–$500/DAY! No experience needed! Just like & share social media posts for brands. WhatsApp us NOW: +65 8888 7777. Limited slots available! 🌟',
+    likes: '4.2K',
+    shares: '6.8K',
+    comments: '1.9K',
     correct_answer: 'scam',
     hint:
-      'Check the URL. Official Grab promotions come from grab.com or the Grab app — not third-party websites. Extremely generous free offers are often bait.',
+      'Would any legitimate company pay $300–$500 per day just for liking and sharing posts? What would they need your personal details or payment for after you contact them?',
     explanation:
-      'This is a scam. The domain "grab-rewards-sg.net" is not affiliated with Grab. Legitimate Grab promotions are activated through the official app or grab.com only. This site is designed to steal your Grab account credentials or payment details.',
+      'This is a job scam — specifically a "like and share" or task-based scam. Victims are initially paid small amounts to build trust, then asked to make larger "investments" to unlock bigger payouts, which are never received. No legitimate employer offers $300–$500/day for liking posts with zero experience or qualifications required.',
     red_flags: [
-      { text: 'grab-rewards-sg.net', explanation: 'Not an official Grab domain — real promotions use grab.com or the app', severity: 'high' },
-      { text: '5 FREE rides', explanation: 'Overly generous offer used as bait to get you to click a malicious link', severity: 'high' },
-      { text: 'valid this weekend only!', explanation: 'Artificial deadline prevents you from verifying before acting', severity: 'medium' },
+      { text: '$300–$500/DAY', explanation: 'Unrealistic pay for zero-skill work — far exceeds Singapore\'s median daily wage', severity: 'high' },
+      { text: 'Just like & share social media posts', explanation: 'No company pays hundreds of dollars for social media likes — this hides the actual scam mechanics', severity: 'high' },
+      { text: 'Limited slots available!', explanation: 'False scarcity tactic used to rush you into contact before you can research', severity: 'medium' },
     ],
     manipulation_tactics: [
-      { name: 'Brand Impersonation', description: 'Copies logos and language of a trusted brand to gain credibility', examples: ['Grab', 'grab-rewards-sg.net'] },
-      { name: 'Reward Bait', description: 'Promises free gifts to lower your guard and get personal information', examples: ['5 FREE rides', '10M users celebration'] },
+      { name: 'Too-Good-To-Be-True Offer', description: 'Extremely high pay for minimal effort lowers critical thinking and attracts desperate targets', examples: ['$300–$500/DAY', 'No experience needed'] },
+      { name: 'Urgency & Scarcity', description: 'Creates pressure to act immediately before researching the opportunity', examples: ['WhatsApp NOW', 'Limited slots'] },
     ],
   },
+
+  // ── Q7 ── post / satire ──────────────────────────────────────────────────────
   {
     id: 8,
+    question_type: 'post',
     content:
       '😂 NParks announces MRT stations will now be planted with 500 trees each, with birds\' nests provided at every seat. "Green Singapore has entered the tunnel," says spokesperson. 🌳🚇',
     likes: '26.3K',
@@ -153,36 +186,46 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     comments: '7.4K',
     correct_answer: 'satire',
     hint:
-      'Is the premise physically possible? Is the tone humorous or absurd? Satire often takes real-world trends to an extreme.',
+      'Is this premise physically possible? Is the tone humorous and the scenario deliberately absurd? Satire often takes a real-world trend (like Singapore\'s greenery push) to an extreme.',
     explanation:
-      'This is satire commenting on Singapore\'s real push for greenery in urban spaces. The idea of 500 trees per MRT station and bird nests on every seat is intentionally absurd. The pun "Green Singapore has entered the tunnel" signals this is parody, not news.',
+      'This is satire commenting on Singapore\'s genuine efforts to green its urban infrastructure. The idea of 500 trees per MRT station and birds\' nests on every seat is deliberately impossible. The pun "Green Singapore has entered the tunnel" signals this is parody. Recognising satire prevents you from spreading fictional stories as news.',
     red_flags: [],
     manipulation_tactics: [],
   },
+
+  // ── Q8 ── VIDEO / scam ───────────────────────────────────────────────────────
   {
     id: 9,
-    content:
-      'Research: Screen time above 2 hours/day is permanently destroying Singaporean teenagers\' eyesight. Local doctors confirm 80% of students will need glasses by 2030 and there\'s NO cure.',
-    likes: '9.6K',
-    shares: '12.4K',
-    comments: '3.7K',
-    correct_answer: 'misleading',
+    question_type: 'video',
+    content: 'Watch the video below, then answer: what type of content is this?',
+    likes: '',
+    shares: '',
+    comments: '',
+    video_url: '',
+    video_title: 'He Made $8,200 in 14 Days — Singapore Trading Group Exposed?',
+    video_description:
+      'An enthusiastic young Singaporean in his 20s films himself talking directly to camera in a casual home setting. He shows his phone screen displaying a trading app with a $8,247 profit balance and excitedly explains how he achieved it through a Telegram channel run by a "trading sifu" from Hong Kong. He says the basic channel is free to join, but premium signals — which he credits for all his profits — cost $200/month, with a "100% guaranteed returns or refund" promise. He urges viewers to join quickly as only 50 new members are accepted per month.',
+    correct_answer: 'scam',
     hint:
-      'Are these statistics backed by a specific study? "Local doctors" is vague — which doctors, from which hospitals? "NO cure" is an extreme claim.',
+      'In Singapore, investment advisory services must be licensed by MAS. Anyone offering "guaranteed returns" on investments is either lying or operating illegally. Would a genuinely profitable trader share their edge publicly?',
     explanation:
-      'This is misleading content. While screen time can contribute to myopia, the claim of "permanently destroying" vision and "no cure" is medically exaggerated. The 80% figure is unsubstantiated. Myopia is manageable. Real research cites authors, institutions, and methodology.',
+      'This is an investment scam recruitment video — specifically a Telegram trading group scam. The "guaranteed returns" claim is illegal under MAS regulations and is always false. The urgency tactic ("50 members/month") and the show of large profits are designed to lower your guard. Victims who join and pay for premium signals typically receive losing trades and eventually cannot withdraw their funds. Always verify investment platforms on the MAS Investor Alert List at mas.gov.sg.',
     red_flags: [
-      { text: 'permanently destroying', explanation: 'Extreme, permanent framing unsupported by cited research', severity: 'high' },
-      { text: '80% of students will need glasses', explanation: 'Very precise statistic with no source attribution', severity: 'high' },
-      { text: 'there\'s NO cure', explanation: 'Absolute claim — myopia management exists and is well-established medically', severity: 'medium' },
+      { text: '100% guaranteed returns or refund', explanation: 'No legitimate investment guarantees returns — this promise is always a lie', severity: 'high' },
+      { text: 'Sifu Kenny — 15 years experience', explanation: 'Unverifiable anonymous expert used to build false credibility', severity: 'high' },
+      { text: 'Only 50 new members per month', explanation: 'False scarcity tactic to rush victims into paying before researching', severity: 'medium' },
     ],
     manipulation_tactics: [
-      { name: 'Health Fearmongering', description: 'Uses exaggerated medical claims to trigger parental fear and sharing', examples: ['permanently destroying', 'NO cure'] },
-      { name: 'Vague Authority', description: 'Attributes claims to unnamed experts to avoid fact-checking', examples: ['Local doctors confirm'] },
+      { name: 'Social Proof via Testimony', description: 'Uses a peer testimonial with visible "proof" to make the scam feel credible and relatable', examples: ['shows phone screen with profits', 'I\'m not sponsored, just sharing'] },
+      { name: 'Guaranteed Returns Fraud', description: 'Makes an illegal promise of guaranteed profits to attract victims who fear missing out', examples: ['100% guaranteed returns', '$8,200 in 14 days'] },
+      { name: 'Scarcity Pressure', description: 'Limits membership artificially to manufacture urgency and exclusivity', examples: ['only 50 members/month', '12 spots left'] },
     ],
   },
+
+  // ── Q9 ── post / real ────────────────────────────────────────────────────────
   {
     id: 10,
+    question_type: 'post',
     content:
       '⚠️ Advisory from MAS: The Monetary Authority of Singapore warns the public about unlicensed cryptocurrency investment platforms promising guaranteed returns. Always check if platforms are licensed at mas.gov.sg/investor-alert-list.',
     likes: '4.1K',
@@ -190,54 +233,29 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     comments: '892',
     correct_answer: 'real',
     hint:
-      'Does this come from a verifiable government source? Is the advice actionable and does it reference an official website you can independently check?',
+      'Does this come from a verifiable government source? Is the advice cautious and actionable, and does it reference an official website you can independently check right now?',
     explanation:
-      'This is real, official information. MAS regularly issues advisories about investment scams. The specific reference to mas.gov.sg/investor-alert-list is a verifiable, real resource. The cautious, advisory tone — rather than urgent action — is consistent with genuine government communications.',
+      'This is real, official information from the Monetary Authority of Singapore. MAS regularly issues advisories about investment scams. The specific reference to mas.gov.sg/investor-alert-list is a verifiable, real resource you can visit. Notice the tone is advisory — no urgency, no suspicious links, no requests for personal information.',
     red_flags: [],
     manipulation_tactics: [],
   },
 ];
 
-export const TOTAL_QUESTIONS = SPOT_THE_SPIN_QUESTIONS.length;
+export const TOTAL_QUESTIONS = SPOT_THE_SPIN_QUESTIONS.length; // 10
 
 export const MISSION_BADGES = [
-  {
-    badge_slug: 'spin-spotter',
-    badge_name: 'Spin Spotter',
-    badge_icon: '🎯',
-    description: 'Complete Module 1',
-    requirement: 'Classify all 10 posts correctly',
-  },
-  {
-    badge_slug: 'ripple-breaker',
-    badge_name: 'Ripple Breaker',
-    badge_icon: '⛓️',
-    description: 'Complete Module 2',
-    requirement: 'Trace 5 misinformation chains',
-  },
-  {
-    badge_slug: 'truth-guardian',
-    badge_name: 'Truth Guardian',
-    badge_icon: '🛡️',
-    description: 'Complete all modules',
-    requirement: 'Finish all 3 modules',
-  },
-  {
-    badge_slug: 'squad-strategist',
-    badge_name: 'Squad Strategist',
-    badge_icon: '👥',
-    description: 'Complete Module 3',
-    requirement: 'Fact-check with 3 teammates',
-  },
+  { badge_slug: 'spin-spotter',   badge_name: 'Spin Spotter',    badge_icon: '🎯', description: 'Complete Module 1',      requirement: 'Finish all 10 questions in Spot the Spin' },
+  { badge_slug: 'ripple-breaker', badge_name: 'Ripple Breaker',  badge_icon: '⛓️', description: 'Complete Module 2',      requirement: 'Trace 5 misinformation chains' },
+  { badge_slug: 'truth-guardian', badge_name: 'Truth Guardian',  badge_icon: '🛡️', description: 'Complete all modules',   requirement: 'Finish all 3 modules' },
+  { badge_slug: 'squad-strategist', badge_name: 'Squad Strategist', badge_icon: '👥', description: 'Complete Module 3', requirement: 'Fact-check with 3 teammates' },
 ];
 
 export const MODULE_SLUGS = ['spot-the-spin', 'chain-reaction', 'shield-squad'] as const;
 export type ModuleSlug = typeof MODULE_SLUGS[number];
 
-// XP awarded per question
 export const XP_CORRECT = 50;
 export const XP_WRONG = 40;
-// XP bonus on module completion
+
 export const MODULE_COMPLETION_XP: Record<ModuleSlug, number> = {
   'spot-the-spin': 200,
   'chain-reaction': 150,

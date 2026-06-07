@@ -1,0 +1,111 @@
+================================================================================
+MODULE 1 — SPOT THE SPIN
+Video Scenario #3: Investment Testimonial / Trading Group Recruitment
+Target Question Index: 8 (ninth question in the 10-question set)
+Correct Answer: SCAM
+Duration: ~60–90 seconds
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+SCENE DESCRIPTION
+────────────────────────────────────────────────────────────────────────────────
+Setting: A casual home bedroom or living room. Spontaneous, "authentic" feel.
+The protagonist — a young Singaporean man in his early-to-mid 20s, relaxed
+clothing (t-shirt, maybe a cap) — films himself on a phone, selfie-style.
+
+He is excited, energetic, speaks quickly. He keeps showing his phone screen
+to the camera to display a trading app with a large profit figure.
+
+This is the "friend testimonial" format — one of the most effective social
+engineering vectors because it feels genuine, peer-to-peer, and not like
+advertising.
+
+────────────────────────────────────────────────────────────────────────────────
+FULL DIALOGUE SCRIPT
+────────────────────────────────────────────────────────────────────────────────
+
+[PROTAGONIST — speaking directly into front camera, casual, excited energy]
+
+PROTAGONIST: "Eh bro, I seriously have to share this. I've been in this
+trading group for two weeks, and I already made over eight thousand dollars.
+Look — look at this."
+
+[He tilts the phone to show a trading app balance screen: "$8,247.50 — Total
+Profit" highlighted in green. The app name is blurred/fictional.]
+
+PROTAGONIST: "I know, I know — you're thinking this is fake. I thought the
+same thing. But the guy running it, Sifu Kenny — fifteen years of experience,
+he was a Goldman Sachs analyst — his signals are insane. Like, literally one
+hundred percent win rate this month."
+
+[He leans in closer to camera, lowering voice slightly as if sharing a secret]
+
+PROTAGONIST: "I'm not sponsored. I'm not getting paid to say this. I'm only
+sharing because the group only takes fifty new members a month, and there are
+twelve spots left. The basic channel is free, but his premium signals — that's
+where the real money is — it's only two hundred a month. And he guarantees
+returns, or full refund. No risk at all."
+
+[He shows a Telegram group screenshot — a chat with many members and a
+"Sifu Kenny Signals" header. Message previews show: "BUY XAUUSD at 2301 —
+TP 2340 — Hit!"]
+
+PROTAGONIST: "Seriously — what's there to lose? Join the free channel first
+lah. I'll drop the link in the bio."
+
+[Screen fades. Lower-third: "Sifu Kenny Premium Signals — t.me/sifukenny"]
+
+[End of video]
+
+────────────────────────────────────────────────────────────────────────────────
+VISUAL DIRECTION NOTES
+────────────────────────────────────────────────────────────────────────────────
+- Selfie-cam aesthetic: slightly shaky, portrait or very slight letterbox
+- Environment: Singaporean bedroom — HDB wall, maybe a sports poster or anime
+  figure visible in the background
+- The trading app screen should look like a real app but with a fictional name
+  and clearly positive (green) balance figures
+- The Telegram screenshot should look authentic but use clearly fictional
+  usernames and a fictional group name
+- Lighting: natural light (window), not studio — enhances the "candid" feel
+- Pacing: fast, energetic editing. Quick cuts when he shows the phone screen.
+- End on a friendly, persuasive smile — the charm is part of the danger
+- No background music until the final fade-out (then a subtle hook suggesting
+  something is off — a single dissonant note)
+
+────────────────────────────────────────────────────────────────────────────────
+RED FLAGS TO HIGHLIGHT (for quiz feedback screen)
+────────────────────────────────────────────────────────────────────────────────
+1. "100% win rate" / "guaranteed returns" — impossible in financial markets;
+   making such claims for investment services is illegal under MAS regulations
+2. "Sifu Kenny — Goldman Sachs analyst" — unverifiable claim; real professionals
+   do not cold-recruit through Telegram
+3. "Only 12 spots left" — false scarcity to bypass due diligence
+4. Shows app profit balance — easily faked via screen editors or demo accounts
+5. MAS check: always verify at mas.gov.sg/investor-alert-list before investing
+
+────────────────────────────────────────────────────────────────────────────────
+AI VIDEO GENERATION PROMPT
+(for tools like Sora, Runway ML Gen-3, Pika Labs, HeyGen, Kling)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT:
+A short social-media style testimonial video filmed on a smartphone selfie
+camera. A young Asian Singaporean man in his early 20s (casual t-shirt, cap)
+sits in a casual HDB bedroom and speaks excitedly and directly into the
+camera. He tilts the phone to show a trading app screen displaying a profit
+of $8,247. He speaks quickly and enthusiastically about a Telegram trading
+group called "Sifu Kenny Signals" that offers "100% guaranteed returns."
+He shows a Telegram screenshot with active members and win-signals. The
+energy is warm, peer-to-peer, convincing — not like an ad. The video should
+feel authentic, like a real friend sharing good news. At the end, a lower-
+third graphic shows a fictional Telegram link. Duration: 60–90 seconds.
+Portrait or slight landscape format (9:16 or 16:9).
+
+STYLE: Organic, candid, handheld social-media content. Singaporean accent
+and casual Singlish phrasing ("lah", "eh bro"). Fast editing on phone screen
+reveals. Natural bedroom lighting.
+
+ASPECT RATIO: 9:16 (portrait/TikTok style preferred) or 16:9
+LANGUAGE: English with Singlish flavour. Subtitles in English.
+================================================================================
