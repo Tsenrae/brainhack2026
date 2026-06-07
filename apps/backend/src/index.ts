@@ -8,6 +8,7 @@ import { scannerRouter } from './routes/scanner.routes.js';
 import { leaderboardRouter } from './routes/leaderboard.routes.js';
 import { squadsRouter } from './routes/squads.routes.js';
 import { reportsRouter } from './routes/reports.routes.js';
+import { scenariosRouter } from './routes/scenarios.routes.js';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 5000);
@@ -29,6 +30,7 @@ app.use('/api/scanner', scannerRouter);
 app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/squads', squadsRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/scenarios', scenariosRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
