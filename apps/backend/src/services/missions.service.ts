@@ -45,16 +45,18 @@ function overallProgress(modules: ModuleProgress[]): number {
   return Math.round((completedModules / MODULE_SLUGS.length) * 100);
 }
 
-// Mock session state — module 1 in-progress at question 5
+// Mutable mock state so the quiz advances on each answer in mock/dev mode
+let mockSpotTheSpinProgress: ModuleProgress = {
+  module_slug: 'spot-the-spin',
+  status: 'in_progress',
+  correct_count: 0,
+  wrong_count: 0,
+  last_question_index: 0,
+  completed_at: null,
+};
+
 const MOCK_MODULES: ModuleProgress[] = [
-  {
-    module_slug: 'spot-the-spin',
-    status: 'in_progress',
-    correct_count: 4,
-    wrong_count: 1,
-    last_question_index: 5,
-    completed_at: null,
-  },
+  mockSpotTheSpinProgress,
   DEFAULT_MODULE_PROGRESS('chain-reaction'),
   DEFAULT_MODULE_PROGRESS('shield-squad'),
 ];
@@ -88,17 +90,17 @@ export const missionsService = {
 
   async getQuizSession(userId: string): Promise<QuizSessionResponse> {
     if (isMockMode) {
-      const idx = MOCK_MODULES[0].last_question_index;
+      const idx = Math.min(mockSpotTheSpinProgress.last_question_index, TOTAL_QUESTIONS - 1);
       const question = SPOT_THE_SPIN_QUESTIONS[idx];
       return {
         question_index: idx,
         total_questions: TOTAL_QUESTIONS,
         question,
-        correct_count: MOCK_MODULES[0].correct_count,
-        wrong_count: MOCK_MODULES[0].wrong_count,
-        session_xp: MOCK_MODULES[0].correct_count * XP_CORRECT + MOCK_MODULES[0].wrong_count * XP_WRONG,
-        streak: 3,
-        status: MOCK_MODULES[0].status,
+        correct_count: mockSpotTheSpinProgress.correct_count,
+        wrong_count: mockSpotTheSpinProgress.wrong_count,
+        session_xp: mockSpotTheSpinProgress.correct_count * XP_CORRECT + mockSpotTheSpinProgress.wrong_count * XP_WRONG,
+        streak: 0,
+        status: mockSpotTheSpinProgress.status,
       };
     }
 
@@ -117,7 +119,7 @@ export const missionsService = {
     if (progress.status === 'not_started') {
       await supabaseAdmin!
         .from('mission_progress')
-        .upsert({ user_id: userId, module_slug: 'spot-the-spin', status: 'in_progress' });
+        .upsert({ user_id: userId, module_slug: 'spot-the-spin', status: 'in_progress' }, { onConflict: 'user_id,module_slug' });
     }
 
     const idx = Math.min(progress.last_question_index, TOTAL_QUESTIONS - 1);
@@ -148,12 +150,20 @@ export const missionsService = {
     const xpAwarded = isCorrect ? XP_CORRECT : XP_WRONG;
 
     if (isMockMode) {
-      const mockProgress = MOCK_MODULES[0];
-      const newCorrect = mockProgress.correct_count + (isCorrect ? 1 : 0);
-      const newWrong = mockProgress.wrong_count + (isCorrect ? 0 : 1);
+      const newCorrect = mockSpotTheSpinProgress.correct_count + (isCorrect ? 1 : 0);
+      const newWrong = mockSpotTheSpinProgress.wrong_count + (isCorrect ? 0 : 1);
       const nextIdx = questionIndex + 1;
       const sessionComplete = nextIdx >= TOTAL_QUESTIONS;
       const accuracy = Math.round((newCorrect / (newCorrect + newWrong)) * 100);
+
+      // Persist state so the next getQuizSession call returns the right question
+      mockSpotTheSpinProgress.correct_count = newCorrect;
+      mockSpotTheSpinProgress.wrong_count = newWrong;
+      mockSpotTheSpinProgress.last_question_index = sessionComplete ? TOTAL_QUESTIONS : nextIdx;
+      if (sessionComplete) {
+        mockSpotTheSpinProgress.status = 'completed';
+        mockSpotTheSpinProgress.completed_at = new Date().toISOString();
+      }
 
       return {
         is_correct: isCorrect,
@@ -167,7 +177,7 @@ export const missionsService = {
         session_complete: sessionComplete,
         accuracy_pct: accuracy,
         question,
-        newly_earned_badges: [],
+        newly_earned_badges: sessionComplete ? ['spin-spotter'] : [],
       };
     }
 
@@ -198,7 +208,7 @@ export const missionsService = {
     };
     if (sessionComplete) updates.completed_at = new Date().toISOString();
 
-    await supabaseAdmin!.from('mission_progress').upsert(updates);
+    await supabaseAdmin!.from('mission_progress').upsert(updates, { onConflict: 'user_id,module_slug' });
 
     // Award XP
     const updatedProfile = await usersService.awardXp(userId, { amount: xpAwarded });

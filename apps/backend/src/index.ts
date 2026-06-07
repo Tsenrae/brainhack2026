@@ -5,6 +5,9 @@ import { usersRouter } from './routes/users.routes.js';
 import { missionsRouter } from './routes/missions.routes.js';
 import { badgesRouter } from './routes/badges.routes.js';
 import { scannerRouter } from './routes/scanner.routes.js';
+import { leaderboardRouter } from './routes/leaderboard.routes.js';
+import { squadsRouter } from './routes/squads.routes.js';
+import { reportsRouter } from './routes/reports.routes.js';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 5000);
@@ -23,6 +26,9 @@ app.use('/api/users', usersRouter);
 app.use('/api/missions', missionsRouter);
 app.use('/api/badges', badgesRouter);
 app.use('/api/scanner', scannerRouter);
+app.use('/api/leaderboard', leaderboardRouter);
+app.use('/api/squads', squadsRouter);
+app.use('/api/reports', reportsRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

@@ -1,0 +1,97 @@
+================================================================================
+MODULE 1 — SPOT THE SPIN
+Video Scenario #2: Fake Government Grant Announcement Video
+Target Question Index: 5 (sixth question in the 10-question set)
+Correct Answer: MISLEADING
+Duration: ~60–90 seconds
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+SCENE DESCRIPTION
+────────────────────────────────────────────────────────────────────────────────
+Setting: A professional-looking home office or studio.
+A well-dressed woman in her 30s (blazer, neat bun) sits at a clean desk.
+Behind her: the Singapore flag, slightly out of focus.
+On the desk: a generic "government-style" plaque (blurred/placeholder text)
+and a laptop.
+
+The video mimics the look of an official government announcement video — but
+has subtle details that mark it as fake (wrong URL lower-third, no official
+watermark, stock-photo-quality background).
+
+────────────────────────────────────────────────────────────────────────────────
+FULL DIALOGUE SCRIPT
+────────────────────────────────────────────────────────────────────────────────
+
+[WOMAN speaks directly to camera, authoritative tone, slight urgency]
+
+WOMAN: "Good afternoon. On behalf of the Ministry of Finance, I am pleased
+to announce the Singapore Recovery Assistance Package — a new initiative
+providing eligible Singaporeans with a one-time payment of one thousand, five
+hundred dollars."
+
+[On-screen graphic appears: "Singapore Recovery Assistance Package — $1,500"]
+
+WOMAN: "To receive your payment, you must register before the deadline — this
+offer closes in forty-eight hours, and slots are filling up quickly."
+
+[Lower-third graphic appears: "sg-recovery-gov.xyz — Register Now"]
+
+WOMAN: "Visit sg-recovery-gov.xyz to claim your payment. You will need your
+SingPass credentials to verify your eligibility. Please act now — this
+programme is available on a first-come, first-served basis."
+
+[Upbeat music fades in slightly. Screen fades with:
+"Limited slots remaining — act now before your payment is forfeited."]
+
+[End of video]
+
+────────────────────────────────────────────────────────────────────────────────
+VISUAL DIRECTION NOTES
+────────────────────────────────────────────────────────────────────────────────
+- The set looks official but has subtle tells:
+    • The URL shown is ".xyz" not ".gov.sg"
+    • The official-looking seal on the desk is blurred/not recognisable
+    • No logo watermark in the corner (real government videos always have one)
+    • The graphic font is slightly wrong compared to real government materials
+- Camera: static, front-on, slightly too perfect — uncanny valley of "official"
+- Lighting: studio lighting that is just slightly too bright/flat
+- Include a small on-screen countdown timer graphic ("48:00:00") that ticks
+  down, displayed in the lower-right corner during the second half
+- Colour grade: clean and neutral, matching typical government video palettes
+
+────────────────────────────────────────────────────────────────────────────────
+RED FLAGS TO HIGHLIGHT (for quiz feedback screen)
+────────────────────────────────────────────────────────────────────────────────
+1. URL is sg-recovery-gov.xyz — not a .gov.sg domain (all Singapore govt sites
+   use .gov.sg exclusively)
+2. "Slots filling up fast" — government entitlements don't have limited slots
+3. 48-hour deadline — government programmes are announced with long notice periods
+4. Requests SingPass credentials — visit the link first, never provide credentials
+   based on a video alone
+
+────────────────────────────────────────────────────────────────────────────────
+AI VIDEO GENERATION PROMPT
+(for tools like Sora, Runway ML Gen-3, Pika Labs, HeyGen, Kling)
+────────────────────────────────────────────────────────────────────────────────
+
+PROMPT:
+A short realistic video mimicking the look of an official Singapore government
+announcement. A professional Asian woman in her 30s (blazer, neat bun) sits
+at a clean desk against a blurred Singapore flag background, speaking directly
+to camera in a formal, authoritative tone. The video has official-looking
+on-screen graphics: a lower-third banner reading "Singapore Recovery Assistance
+Package — $1,500" and a URL lower-third reading "sg-recovery-gov.xyz".
+Subtly, the URL is the wrong domain format (not .gov.sg), a slight tell that
+something is off. A small countdown timer "48:00:00" appears in the corner.
+The overall effect should look convincingly official at first glance, but
+contain these subtle inconsistencies for educational purposes. Duration: 60–90
+seconds. Cinematic, realistic. No fantasy elements.
+
+STYLE: Corporate/government video aesthetic. Clean studio lighting. Direct
+address to camera. Use on-screen text graphics in a sans-serif font similar
+to government communications, but with small deliberate errors in domain name.
+
+ASPECT RATIO: 16:9
+LANGUAGE: Subtitles in English for all spoken dialogue.
+================================================================================

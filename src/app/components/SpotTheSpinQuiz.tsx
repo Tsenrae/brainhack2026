@@ -1,16 +1,21 @@
-import { Clock, Lightbulb, Flag, SkipForward, ArrowLeft, Zap, Target, Flame, Trophy, CheckCircle } from 'lucide-react';
+import { Clock, Lightbulb, Flag, SkipForward, ArrowLeft, Zap, Target, Flame, Trophy, CheckCircle, Play } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 type QuizAnswerType = 'real' | 'misleading' | 'satire' | 'scam';
+type QuestionType = 'post' | 'video';
 
 interface QuizQuestion {
   id: number;
+  question_type: QuestionType;
   content: string;
   likes: string;
   shares: string;
   comments: string;
+  video_url?: string;
+  video_title?: string;
+  video_description?: string;
   hint: string;
   correct_answer: QuizAnswerType;
   explanation: string;
@@ -179,39 +184,72 @@ export function SpotTheSpinQuiz() {
             </div>
           </div>
 
-          {/* Post Card */}
-          <div className="bg-white rounded-2xl p-6 border-2 border-gray-200 shadow-lg">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
-                <div className="w-12 h-12 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center text-white font-bold">
-                  ?
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-gray-900">[User Identity Hidden]</div>
-                  <div className="text-sm text-gray-500">2 hours ago</div>
-                </div>
+          {/* Question Card — post or video */}
+          {question.question_type === 'video' ? (
+            <div className="bg-white rounded-2xl border-2 border-gray-200 shadow-lg overflow-hidden">
+              {/* Video Player Placeholder */}
+              <div className="relative bg-gray-900 aspect-video flex flex-col items-center justify-center gap-3">
+                {question.video_url ? (
+                  <iframe
+                    src={question.video_url}
+                    title={question.video_title ?? 'Scenario video'}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <>
+                    <div className="w-20 h-20 rounded-full bg-white/10 border-2 border-white/30 flex items-center justify-center">
+                      <Play className="w-10 h-10 text-white fill-white" />
+                    </div>
+                    <p className="text-white/60 text-sm">Video coming soon</p>
+                  </>
+                )}
               </div>
-
-              <div className="py-4">
-                <p className="text-lg text-gray-900 leading-relaxed">{question.content}</p>
+              <div className="p-6 space-y-2">
+                <div className="inline-flex items-center gap-1.5 bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <Play className="w-3 h-3" /> Video Scenario
+                </div>
+                <h3 className="font-bold text-gray-900 text-lg">{question.video_title}</h3>
+                {question.video_description && (
+                  <p className="text-sm text-gray-600 leading-relaxed">{question.video_description}</p>
+                )}
               </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl p-6 border-2 border-gray-200 shadow-lg">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
+                  <div className="w-12 h-12 bg-gradient-to-br from-gray-300 to-gray-400 rounded-full flex items-center justify-center text-white font-bold">
+                    ?
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-gray-900">[User Identity Hidden]</div>
+                    <div className="text-sm text-gray-500">2 hours ago</div>
+                  </div>
+                </div>
 
-              <div className="flex items-center gap-6 pt-4 border-t border-gray-200 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <span>❤️</span>
-                  <span className="font-medium">{question.likes} likes</span>
+                <div className="py-4">
+                  <p className="text-lg text-gray-900 leading-relaxed">{question.content}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>🔄</span>
-                  <span className="font-medium">{question.shares} shares</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>💬</span>
-                  <span className="font-medium">{question.comments} comments</span>
+
+                <div className="flex items-center gap-6 pt-4 border-t border-gray-200 text-sm text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <span>❤️</span>
+                    <span className="font-medium">{question.likes} likes</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>🔄</span>
+                    <span className="font-medium">{question.shares} shares</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>💬</span>
+                    <span className="font-medium">{question.comments} comments</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Hint */}
           {showHint ? (
@@ -236,7 +274,9 @@ export function SpotTheSpinQuiz() {
 
           {/* Classification Options */}
           <div>
-            <h3 className="text-lg font-bold text-gray-900 mb-4">How would you classify this post?</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              How would you classify this {question.question_type === 'video' ? 'video' : 'post'}?
+            </h3>
             <div className="grid grid-cols-2 gap-4">
               {ANSWER_OPTIONS.map((option) => (
                 <button

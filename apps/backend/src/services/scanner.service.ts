@@ -1,231 +1,304 @@
 import { supabaseAdmin, isMockMode } from '../config/supabase.js';
+import { groqClient, isGroqEnabled, GROQ_MODEL } from '../config/groq.js';
 import { usersService } from './users.service.js';
 import { badgesService } from './badges.service.js';
 import type {
-  ScanType, ScanResult, ScanHistoryItem, ScannerStats,
-  SuspiciousElement, ScanRedFlag, RecommendedAction,
+  ScanType, ThreatLevel, ScanResult, ScanHistoryItem, ScannerStats,
+  SuspiciousElement, ScanRedFlag, RecommendedAction, AnalysisBreakdown,
 } from '../types/scanner.types.js';
 
 const XP_PER_SCAN = 30;
 const XP_THREAT_BONUS = 20;
 
-// ── Pattern libraries ──────────────────────────────────────────────────────────
+// ── System prompt ──────────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are a cybersecurity threat analyst specialising in Singapore digital threats. Analyse the provided content for scams, phishing, misinformation, deepfakes, and other threats targeting Singapore users.
+
+Return ONLY a valid JSON object with this exact structure — no markdown, no commentary, just raw JSON:
+{
+  "risk_score": <integer 0–100>,
+  "threat_level": <"safe"|"low"|"suspicious"|"high"|"critical">,
+  "classification": <"Safe"|"Low Risk"|"Suspicious"|"Phishing"|"Scam"|"Misinformation"|"Deepfake">,
+  "confidence_score": <integer 50–99>,
+  "suspicious_elements": [
+    {
+      "element": <string: name of the suspicious element>,
+      "location": <string: where in the content — e.g. "Message body", "URL", "Sender field">,
+      "severity": <"CRITICAL"|"HIGH"|"MEDIUM"|"LOW">,
+      "description": <string: concise description of what was found, max 100 chars>
+    }
+  ],
+  "red_flags": [
+    {
+      "title": <string: category name, e.g. "Urgency Pressure">,
+      "description": <string: why this pattern is dangerous>,
+      "examples": [<string: quoted text or pattern found in the content, 2–4 items>],
+      "severity": <"CRITICAL"|"HIGH"|"MEDIUM"|"LOW">
+    }
+  ],
+  "recommended_actions": [
+    {
+      "action": <string: short action title>,
+      "description": <string: specific guidance>,
+      "priority": <"CRITICAL"|"HIGH"|"MEDIUM"|"RECOMMENDED">
+    }
+  ],
+  "analysis_breakdown": {
+    "pattern_matches": <integer: number of suspicious patterns found>,
+    "manipulation_tactics": <integer: number of psychological manipulation tactics found>,
+    "match_rate_pct": <integer 0–99: how closely this resembles known threats>
+  }
+}
+
+Risk score calibration:
+- 0–20: Safe — no meaningful threat signals
+- 21–40: Low — minor signals, likely benign
+- 41–60: Suspicious — multiple warning signs, investigate further
+- 61–80: High — strong threat indicators, likely malicious
+- 81–100: Critical — clear scam, phishing, or fraud
+
+Singapore-specific threats to detect:
+- CPF / HDB / IRAS / MOM / MOH government impersonation
+- DBS / OCBC / UOB / POSB / Standard Chartered bank phishing
+- Telegram or WhatsApp investment scams ("guaranteed returns", "trading group")
+- Job scams ("part-time work from home", "$300/day", "click like to earn")
+- Love scams (building emotional trust before requesting money)
+- SingPass / Myinfo credential phishing
+- Fake GST voucher, CDC voucher, or government grant claims
+- Misinformation about local news, policies, or public figures
+- URLs impersonating gov.sg domains (g0v.sg, gov-sg.xyz, etc.)
+
+Rules:
+- suspicious_elements: include up to 5, sorted by severity descending
+- red_flags: include only categories that actually apply (0–5)
+- recommended_actions: always include at least 2, max 6
+- If content is clearly safe, return risk_score ≤ 20 and empty suspicious_elements and red_flags arrays
+- Never hallucinate threat signals that are not present in the content`;
+
+// ── Groq analysis ──────────────────────────────────────────────────────────────
+
+interface LLMAnalysis {
+  risk_score: number;
+  threat_level: ThreatLevel;
+  classification: string;
+  confidence_score: number;
+  suspicious_elements: SuspiciousElement[];
+  red_flags: ScanRedFlag[];
+  recommended_actions: RecommendedAction[];
+  analysis_breakdown: AnalysisBreakdown;
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+function coerceSeverity(s: unknown): SuspiciousElement['severity'] {
+  return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(s as string)
+    ? (s as SuspiciousElement['severity'])
+    : 'MEDIUM';
+}
+
+function coercePriority(p: unknown): RecommendedAction['priority'] {
+  return ['CRITICAL', 'HIGH', 'MEDIUM', 'RECOMMENDED'].includes(p as string)
+    ? (p as RecommendedAction['priority'])
+    : 'MEDIUM';
+}
+
+function validateLLMResponse(raw: unknown): LLMAnalysis {
+  const r = raw as Record<string, unknown>;
+
+  const riskScore = clamp(Number(r.risk_score ?? 0), 0, 100);
+
+  const validLevels = ['safe', 'low', 'suspicious', 'high', 'critical'];
+  const threatLevel = validLevels.includes(r.threat_level as string)
+    ? (r.threat_level as string)
+    : riskScore <= 20 ? 'safe' : riskScore <= 40 ? 'low' : riskScore <= 60 ? 'suspicious' : riskScore <= 80 ? 'high' : 'critical';
+
+  const elements: SuspiciousElement[] = Array.isArray(r.suspicious_elements)
+    ? (r.suspicious_elements as Record<string, unknown>[]).slice(0, 5).map(e => ({
+        element:     String(e.element     ?? 'Suspicious element'),
+        location:    String(e.location    ?? 'Content'),
+        severity:    coerceSeverity(e.severity),
+        description: String(e.description ?? ''),
+      }))
+    : [];
+
+  const flags: ScanRedFlag[] = Array.isArray(r.red_flags)
+    ? (r.red_flags as Record<string, unknown>[]).slice(0, 5).map(f => ({
+        title:       String(f.title       ?? 'Red flag'),
+        description: String(f.description ?? ''),
+        examples:    Array.isArray(f.examples) ? (f.examples as unknown[]).map(String) : [],
+        severity:    coerceSeverity(f.severity),
+      }))
+    : [];
+
+  const actions: RecommendedAction[] = Array.isArray(r.recommended_actions)
+    ? (r.recommended_actions as Record<string, unknown>[]).slice(0, 6).map(a => ({
+        action:      String(a.action      ?? 'Stay vigilant'),
+        description: String(a.description ?? ''),
+        priority:    coercePriority(a.priority),
+      }))
+    : [{ action: 'Stay vigilant', description: 'Exercise caution with this content.', priority: 'RECOMMENDED' }];
+
+  const bd = (r.analysis_breakdown ?? {}) as Record<string, unknown>;
+
+  return {
+    risk_score:       riskScore,
+    threat_level:     threatLevel as ThreatLevel,
+    classification:   String(r.classification ?? (riskScore <= 20 ? 'Safe' : 'Suspicious')),
+    confidence_score: clamp(Number(r.confidence_score ?? 75), 50, 99),
+    suspicious_elements: elements,
+    red_flags:        flags,
+    recommended_actions: actions,
+    analysis_breakdown: {
+      pattern_matches:     clamp(Number(bd.pattern_matches     ?? elements.length), 0, 50),
+      manipulation_tactics: clamp(Number(bd.manipulation_tactics ?? 0), 0, 20),
+      match_rate_pct:      clamp(Number(bd.match_rate_pct      ?? riskScore + 5), 0, 99),
+    },
+  };
+}
+
+async function analyzeWithGroq(type: ScanType, content: string): Promise<LLMAnalysis> {
+  const typeLabels: Record<ScanType, string> = {
+    text: 'text message or written content',
+    url:  'URL or web link',
+    qr:   'URL extracted from a QR code',
+  };
+
+  console.log(`[groq] calling ${GROQ_MODEL} for ${type} scan (${content.length} chars)`);
+
+  const completion = await groqClient!.chat.completions.create({
+    model: GROQ_MODEL,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user',   content: `Analyse this ${typeLabels[type]}:\n\n${content}` },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.1,
+    max_tokens: 2048,
+  });
+
+  const raw = completion.choices[0]?.message?.content;
+  const usage = completion.usage;
+  console.log(`[groq] response received — risk_score will parse from JSON | tokens: ${usage?.prompt_tokens ?? '?'} in / ${usage?.completion_tokens ?? '?'} out`);
+  if (!raw) throw new Error('Groq returned empty response');
+
+  return validateLLMResponse(JSON.parse(raw));
+}
+
+// ── Regex fallback ─────────────────────────────────────────────────────────────
+// Used when GROQ_API_KEY is absent or the LLM call fails.
 
 interface Pattern { pattern: RegExp; weight: number; label: string; location: string; }
 
 const URGENCY: Pattern[] = [
-  { pattern: /\b(urgent|urgently)\b/i,                                   weight: 15, label: 'Urgent language',          location: 'Message body' },
-  { pattern: /\bact now\b/i,                                             weight: 20, label: 'Act now pressure',          location: 'Message body' },
-  { pattern: /\blimited time\b/i,                                        weight: 15, label: 'Limited time pressure',     location: 'Message body' },
-  { pattern: /\bimmediately\b/i,                                         weight: 10, label: 'Immediacy pressure',        location: 'Message body' },
-  { pattern: /\bwithin \d+ hours?\b/i,                                   weight: 15, label: 'Deadline pressure',         location: 'Message body' },
-  { pattern: /\baccount.{0,20}(closed|suspended|blocked|terminated)\b/i, weight: 25, label: 'Account suspension threat', location: 'Message body' },
+  { pattern: /\b(urgent|urgently)\b/i,                                    weight: 15, label: 'Urgent language',          location: 'Message body' },
+  { pattern: /\bact now\b/i,                                              weight: 20, label: 'Act now pressure',          location: 'Message body' },
+  { pattern: /\blimited time\b/i,                                         weight: 15, label: 'Limited time pressure',     location: 'Message body' },
+  { pattern: /\bimmediately\b/i,                                          weight: 10, label: 'Immediacy pressure',        location: 'Message body' },
+  { pattern: /\bwithin \d+ hours?\b/i,                                    weight: 15, label: 'Deadline pressure',         location: 'Message body' },
+  { pattern: /\baccount.{0,20}(closed|suspended|blocked|terminated)\b/i,  weight: 25, label: 'Account suspension threat', location: 'Message body' },
   { pattern: /\bwill be (permanently|automatically) (closed|blocked|deleted)\b/i, weight: 30, label: 'Permanent consequence', location: 'Message body' },
 ];
-
 const CREDENTIALS: Pattern[] = [
-  { pattern: /\b(password|passcode)\b/i,             weight: 35, label: 'Password request',         location: 'Form fields' },
-  { pattern: /\b(OTP|one.time.pass)\b/i,             weight: 40, label: 'OTP request',              location: 'Form fields' },
-  { pattern: /\b(PIN|personal identification)\b/i,   weight: 30, label: 'PIN request',              location: 'Form fields' },
-  { pattern: /\bbank.{0,20}(account|number|detail)\b/i, weight: 35, label: 'Bank account details', location: 'Form fields' },
-  { pattern: /\bcredit card\b/i,                     weight: 30, label: 'Credit card request',      location: 'Form fields' },
-  { pattern: /\binternet banking\b/i,                weight: 25, label: 'Internet banking request', location: 'Form fields' },
-  { pattern: /\b(cvv|card.{0,5}number)\b/i,          weight: 35, label: 'Card details request',     location: 'Form fields' },
+  { pattern: /\b(password|passcode)\b/i,              weight: 35, label: 'Password request',         location: 'Form fields' },
+  { pattern: /\b(OTP|one.time.pass)\b/i,              weight: 40, label: 'OTP request',              location: 'Form fields' },
+  { pattern: /\b(PIN|personal identification)\b/i,    weight: 30, label: 'PIN request',              location: 'Form fields' },
+  { pattern: /\bbank.{0,20}(account|number|detail)\b/i, weight: 35, label: 'Bank account details',  location: 'Form fields' },
+  { pattern: /\bcredit card\b/i,                      weight: 30, label: 'Credit card request',      location: 'Form fields' },
+  { pattern: /\binternet banking\b/i,                 weight: 25, label: 'Internet banking request', location: 'Form fields' },
 ];
-
 const REWARDS: Pattern[] = [
-  { pattern: /\byou.{0,10}(have won|won)\b/i,                     weight: 25, label: 'Prize claim',          location: 'Message body' },
+  { pattern: /\byou.{0,10}(have won|won)\b/i,                      weight: 25, label: 'Prize claim',          location: 'Message body' },
   { pattern: /\bfree (iphone|samsung|laptop|gift|voucher|prize)\b/i, weight: 30, label: 'Free prize offer',  location: 'Message body' },
-  { pattern: /\bgiveaway\b/i,                                      weight: 20, label: 'Giveaway claim',       location: 'Message body' },
-  { pattern: /\bguaranteed (return|profit|income)\b/i,             weight: 30, label: 'Guaranteed returns',   location: 'Message body' },
-  { pattern: /\$[\d,]+.{0,20}(prize|reward|claim|won)\b/i,         weight: 25, label: 'Large monetary prize', location: 'Message body' },
-  { pattern: /\bcongratulations.{0,30}(won|selected|chosen)\b/i,   weight: 20, label: 'Fake congratulations', location: 'Message body' },
+  { pattern: /\bgiveaway\b/i,                                       weight: 20, label: 'Giveaway claim',       location: 'Message body' },
+  { pattern: /\bguaranteed (return|profit|income)\b/i,              weight: 30, label: 'Guaranteed returns',   location: 'Message body' },
 ];
-
 const URLS: Pattern[] = [
   { pattern: /https?:\/\/\d+\.\d+\.\d+\.\d+/i,                    weight: 50, label: 'IP address URL',       location: 'Link / URL' },
-  { pattern: /\b(g0v|gov-sg|govsg|sgbank|s1ng4pore)\b/i,           weight: 45, label: 'Domain impersonation', location: 'Link / URL' },
+  { pattern: /\b(g0v|gov-sg|govsg|sgbank)\b/i,                     weight: 45, label: 'Domain impersonation', location: 'Link / URL' },
   { pattern: /\.(xyz|tk|ml|ga|cf|pw|top)\b/i,                      weight: 40, label: 'Suspicious TLD',       location: 'Link / URL' },
-  { pattern: /\bbit\.ly\b|\btinyurl\b|\bgoo\.gl\b/i,               weight: 20, label: 'Shortened URL',        location: 'Link / URL' },
-  // Negative weight: trust signals that lower the score
-  { pattern: /\b(gov\.sg|mom\.gov\.sg|iras\.gov\.sg|cpf\.gov\.sg)\b/i, weight: -30, label: 'Official Singapore domain', location: 'Link / URL' },
+  { pattern: /\bbit\.ly\b|\btinyurl\b/i,                            weight: 20, label: 'Shortened URL',        location: 'Link / URL' },
+  { pattern: /\b(gov\.sg|mom\.gov\.sg|iras\.gov\.sg)\b/i,           weight: -30, label: 'Official SG domain', location: 'Link / URL' },
 ];
-
 const AUTHORITY: Pattern[] = [
-  { pattern: /\b(singapore police force|SPF)\b/i,          weight: 20, label: 'Police impersonation',        location: 'Sender / header' },
-  { pattern: /\b(ministry of manpower|MOM)\b/i,            weight: 15, label: 'Government impersonation',    location: 'Sender / header' },
-  { pattern: /\b(IRAS|inland revenue)\b/i,                 weight: 15, label: 'Tax authority impersonation', location: 'Sender / header' },
-  { pattern: /\b(CPF board|CPF)\b/i,                       weight: 15, label: 'CPF impersonation',           location: 'Sender / header' },
-  { pattern: /\b(DBS|OCBC|UOB|Standard Chartered).{0,20}verify\b/i, weight: 25, label: 'Bank impersonation', location: 'Sender / header' },
+  { pattern: /\b(singapore police force|SPF)\b/i, weight: 20, label: 'Police impersonation',    location: 'Sender / header' },
+  { pattern: /\b(IRAS|inland revenue)\b/i,         weight: 15, label: 'IRAS impersonation',      location: 'Sender / header' },
+  { pattern: /\b(CPF board|CPF)\b/i,               weight: 15, label: 'CPF impersonation',       location: 'Sender / header' },
+  { pattern: /\b(DBS|OCBC|UOB).{0,20}verify\b/i,  weight: 25, label: 'Bank impersonation',      location: 'Sender / header' },
 ];
-
 const ALL_PATTERNS = [...URGENCY, ...CREDENTIALS, ...REWARDS, ...URLS, ...AUTHORITY];
-
-// ── Analysis helpers ───────────────────────────────────────────────────────────
 
 interface Match { label: string; weight: number; location: string; }
 
-function analyzeContent(content: string): { score: number; matches: Match[] } {
+function analyzeWithRegex(content: string): LLMAnalysis {
   const matches: Match[] = [];
   for (const { pattern, weight, label, location } of ALL_PATTERNS) {
     if (pattern.test(content)) matches.push({ label, weight, location });
   }
   const raw = matches.reduce((s, m) => s + m.weight, 0);
-  return { score: Math.min(100, Math.max(0, raw)), matches };
-}
+  const riskScore = Math.min(100, Math.max(0, raw));
+  const positiveMatches = matches.filter(m => m.weight > 0);
 
-function threatLevel(score: number): string {
-  if (score <= 20) return 'safe';
-  if (score <= 40) return 'low';
-  if (score <= 60) return 'suspicious';
-  if (score <= 80) return 'high';
-  return 'critical';
-}
+  const levelMap = (s: number) =>
+    s <= 20 ? 'safe' : s <= 40 ? 'low' : s <= 60 ? 'suspicious' : s <= 80 ? 'high' : 'critical';
+  const clsMap = (s: number) =>
+    s <= 20 ? 'Safe' : s <= 40 ? 'Low Risk' :
+    matches.some(m => CREDENTIALS.some(p => p.label === m.label)) ? 'Phishing' :
+    matches.some(m => REWARDS.some(p => p.label === m.label)) ? 'Scam' : 'Suspicious';
 
-function classification(score: number, matches: Match[]): string {
-  if (score <= 20) return 'Safe';
-  if (score <= 40) return 'Low Risk';
-  const hasCredentials = matches.some(m => CREDENTIALS.some(p => p.label === m.label));
-  const hasRewards = matches.some(m => REWARDS.some(p => p.label === m.label));
-  const hasUrl = matches.some(m => URLS.filter(p => p.weight > 0).some(p => p.label === m.label));
-  if (hasCredentials) return 'Phishing';
-  if (hasRewards) return 'Scam';
-  if (hasUrl) return 'Phishing';
-  return score > 60 ? 'Scam' : 'Suspicious';
-}
-
-const DESCRIPTIONS: Record<string, string> = {
-  'Urgent language':           '"URGENT", "ACT NOW", "IMMEDIATELY"',
-  'Act now pressure':          'Demands immediate action to bypass careful thinking',
-  'Limited time pressure':     'False scarcity used to rush the target',
-  'Deadline pressure':         'Artificial deadline within hours to create panic',
-  'Account suspension threat': 'Threatens account closure to trigger fear response',
-  'Permanent consequence':     'Threatens irreversible action to maximise pressure',
-  'Password request':          'Asks for account password — no legitimate service ever does this',
-  'OTP request':               'Requests One-Time Password — only scammers need your OTP',
-  'PIN request':               'Asks for personal identification number',
-  'Bank account details':      'Solicits bank account number or financial details',
-  'Credit card request':       'Asks for credit or debit card information',
-  'Internet banking request':  'References internet banking credentials',
-  'Card details request':      'Asks for CVV or card number',
-  'Prize claim':               'Claims you won a prize you never entered',
-  'Free prize offer':          'Unrealistic free item used as lure to click',
-  'Giveaway claim':            'Fake giveaway — usually requires personal info to "claim"',
-  'Guaranteed returns':        'Promises guaranteed profit — hallmark of investment scam',
-  'Large monetary prize':      'Unrealistic monetary prize claim',
-  'Fake congratulations':      'Fake congratulations message to build false excitement',
-  'IP address URL':            'Link uses raw IP address instead of a domain name',
-  'Domain impersonation':      'Domain mimics official site (e.g. g0v-sg.xyz vs gov.sg)',
-  'Suspicious TLD':            'Unusual top-level domain (.xyz, .tk, .ml) common in scam sites',
-  'Shortened URL':             'URL shortener hides actual destination',
-  'Police impersonation':      'Pretends to be from Singapore Police Force',
-  'Government impersonation':  'Impersonates a Singapore government ministry',
-  'Tax authority impersonation': 'Impersonates IRAS — common in tax scam calls',
-  'CPF impersonation':         'Impersonates CPF Board to access retirement savings',
-  'Bank impersonation':        'Spoofs a local bank to steal banking credentials',
-};
-
-function suspiciousElements(matches: Match[]): SuspiciousElement[] {
-  return matches
-    .filter(m => m.weight > 0)
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 5)
+  const elements: SuspiciousElement[] = positiveMatches
+    .sort((a, b) => b.weight - a.weight).slice(0, 5)
     .map(m => ({
-      element: m.label,
-      location: m.location,
+      element: m.label, location: m.location,
       severity: (m.weight >= 35 ? 'CRITICAL' : m.weight >= 25 ? 'HIGH' : m.weight >= 15 ? 'MEDIUM' : 'LOW') as SuspiciousElement['severity'],
-      description: DESCRIPTIONS[m.label] ?? m.label,
+      description: m.label,
     }));
-}
 
-function redFlags(matches: Match[]): ScanRedFlag[] {
+  const hasGroup = (group: Pattern[]) => matches.some(m => group.some(p => p.label === m.label));
   const flags: ScanRedFlag[] = [];
-  const has = (group: Pattern[]) => matches.some(m => group.some(p => p.label === m.label));
+  if (hasGroup(URGENCY)) flags.push({ title: 'Urgency Pressure', description: 'Creates false urgency to bypass careful thinking.', examples: ['"Act now"', '"Limited time"'], severity: 'CRITICAL' });
+  if (hasGroup(CREDENTIALS)) flags.push({ title: 'Requests Sensitive Information', description: 'Legitimate organisations never ask for passwords or OTPs via message.', examples: ['Password', 'OTP', 'PIN'], severity: 'CRITICAL' });
+  if (hasGroup(REWARDS)) flags.push({ title: 'Too Good to Be True', description: 'Unrealistic rewards used to lure victims.', examples: ['"Free prize"', '"Guaranteed returns"'], severity: 'HIGH' });
+  if (hasGroup(URLS.filter(p => p.weight > 0))) flags.push({ title: 'Suspicious Link', description: 'URL shows signs of domain impersonation or suspicious hosting.', examples: ['Suspicious TLD', 'IP address URL'], severity: 'CRITICAL' });
+  if (hasGroup(AUTHORITY)) flags.push({ title: 'Authority Impersonation', description: 'Pretends to be a government agency or bank.', examples: ['Government agency name', 'Bank name'], severity: 'CRITICAL' });
 
-  if (has(URGENCY)) flags.push({
-    title: 'Urgency Pressure',
-    description: 'Creates a false sense of urgency to make you act without thinking carefully',
-    examples: ['"Act now or lose access"', '"Limited time only"', '"Account will be closed in 24 hours"'],
-    severity: 'CRITICAL',
-  });
-
-  if (has(URLS.filter(p => p.weight > 0))) flags.push({
-    title: 'Suspicious Link',
-    description: 'URL does not match any official domain and may lead to a fraudulent website',
-    examples: ['Uses IP addresses or suspicious TLDs (.xyz, .tk)', 'Domain name mimics official sites', 'Recently registered domains'],
-    severity: 'CRITICAL',
-  });
-
-  if (has(CREDENTIALS)) flags.push({
-    title: 'Requests Sensitive Information',
-    description: 'Legitimate organisations never ask for passwords, OTPs, or PINs via message',
-    examples: ['Asks for password or PIN', 'Requests OTP code', 'Asks for internet banking credentials'],
-    severity: 'CRITICAL',
-  });
-
-  if (has(REWARDS)) flags.push({
-    title: 'Too Good to Be True',
-    description: 'Offers unrealistic rewards or prizes — classic lure used by scammers',
-    examples: ['"You won $50,000!"', '"Free iPhone giveaway"', '"Guaranteed investment returns"'],
-    severity: 'HIGH',
-  });
-
-  if (has(AUTHORITY)) flags.push({
-    title: 'Authority Impersonation',
-    description: 'Pretends to be a government agency, bank, or authority figure to gain trust',
-    examples: ['Fake SPF / MOM / IRAS messages', 'Spoofed bank sender names', 'Government logo misuse'],
-    severity: 'CRITICAL',
-  });
-
-  return flags;
-}
-
-function recommendedActions(score: number): RecommendedAction[] {
   const actions: RecommendedAction[] = [];
+  if (riskScore > 40) actions.push({ action: 'Do Not Click Any Links', description: 'Links may lead to fraudulent websites.', priority: 'CRITICAL' });
+  if (riskScore > 60) actions.push({ action: 'Do Not Share Personal Information', description: 'Never provide passwords, PINs, or OTPs through messages.', priority: 'CRITICAL' });
+  actions.push({ action: 'Verify the Source', description: 'Contact the organisation via official channels.', priority: riskScore > 50 ? 'HIGH' : 'MEDIUM' });
+  if (riskScore > 50) actions.push({ action: 'Report to ScamShield', description: 'Forward to ScamShield at 1799 or via the app.', priority: 'HIGH' });
+  actions.push({ action: 'Ask a Trusted Adult or Teacher', description: "If unsure, talk to a parent or teacher before acting.", priority: 'RECOMMENDED' });
 
-  if (score > 40) actions.push({
-    action: 'Do Not Click Any Links',
-    description: 'The links in this content may lead to fraudulent websites designed to steal your information',
-    priority: 'CRITICAL',
-  });
+  const manipTactics = matches.filter(m => [...URGENCY, ...CREDENTIALS, ...REWARDS].some(p => p.label === m.label)).length;
 
-  if (score > 60) actions.push({
-    action: 'Do Not Share Personal Information',
-    description: 'Never provide passwords, PINs, OTPs, or banking details through messages or links',
-    priority: 'CRITICAL',
-  });
-
-  actions.push({
-    action: 'Verify the Source',
-    description: 'Contact the organisation directly using official channels — not links in the message',
-    priority: score > 50 ? 'HIGH' : 'MEDIUM',
-  });
-
-  if (score > 50) {
-    actions.push({
-      action: 'Report to ScamShield',
-      description: 'Forward suspicious messages to ScamShield at 1799 or report via the ScamShield app',
-      priority: 'HIGH',
-    });
-    actions.push({
-      action: 'Block the Sender',
-      description: 'Block this number or contact to prevent further scam attempts',
-      priority: 'MEDIUM',
-    });
-  }
-
-  actions.push({
-    action: 'Ask a Trusted Adult or Teacher',
-    description: "If you're unsure, talk to a parent, teacher, or trusted adult before taking any action",
-    priority: 'RECOMMENDED',
-  });
-
-  return actions;
+  return {
+    risk_score: riskScore,
+    threat_level: levelMap(riskScore),
+    classification: clsMap(riskScore),
+    confidence_score: Math.min(99, (riskScore > 70 ? 88 : riskScore > 40 ? 74 : 93) + Math.min(8, positiveMatches.length * 2)),
+    suspicious_elements: elements,
+    red_flags: flags,
+    recommended_actions: actions,
+    analysis_breakdown: {
+      pattern_matches: positiveMatches.length,
+      manipulation_tactics: manipTactics,
+      match_rate_pct: Math.min(99, riskScore + 10),
+    },
+  };
 }
 
-function confidence(score: number, positiveMatches: number): number {
-  const base = score > 70 ? 90 : score > 40 ? 75 : score > 20 ? 65 : 95;
-  return Math.min(99, base + Math.min(9, positiveMatches * 2));
+// ── Core analysis dispatcher ───────────────────────────────────────────────────
+
+async function analyse(type: ScanType, content: string): Promise<LLMAnalysis> {
+  if (isGroqEnabled) {
+    try {
+      return await analyzeWithGroq(type, content);
+    } catch (err) {
+      console.warn('[scanner] Groq failed, falling back to regex:', (err as Error).message);
+    }
+  }
+  return analyzeWithRegex(content);
 }
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
@@ -233,7 +306,7 @@ function confidence(score: number, positiveMatches: number): number {
 const MOCK_HISTORY: ScanHistoryItem[] = [
   { scan_id: 'mock-1', type: 'text', content_preview: 'BREAKING: Free iPhone giveaway! Click now...', risk_score: 92, classification: 'Scam', scanned_at: new Date(Date.now() - 7200000).toISOString() },
   { scan_id: 'mock-2', type: 'url',  content_preview: 'gov.sg/digital-safety-tips', risk_score: 5, classification: 'Safe', scanned_at: new Date(Date.now() - 86400000).toISOString() },
-  { scan_id: 'mock-3', type: 'text', content_preview: 'Screenshot of WhatsApp message — suspicious activity', risk_score: 67, classification: 'Suspicious', scanned_at: new Date(Date.now() - 172800000).toISOString() },
+  { scan_id: 'mock-3', type: 'text', content_preview: 'Suspicious WhatsApp message about account', risk_score: 67, classification: 'Suspicious', scanned_at: new Date(Date.now() - 172800000).toISOString() },
 ];
 
 const MOCK_STATS: ScannerStats = { total_scans: 47, threats_found: 12, safe_count: 35, xp_earned: 1175 };
@@ -242,53 +315,37 @@ const MOCK_STATS: ScannerStats = { total_scans: 47, threats_found: 12, safe_coun
 
 export const scannerService = {
   async scan(userId: string, type: ScanType, content: string): Promise<ScanResult> {
-    const { score, matches } = analyzeContent(content);
-    const level = threatLevel(score);
-    const cls = classification(score, matches);
-    const positiveMatches = matches.filter(m => m.weight > 0);
-    const conf = confidence(score, positiveMatches.length);
-    const elements = suspiciousElements(matches);
-    const flags = redFlags(matches);
-    const actions = recommendedActions(score);
+    const analysis = await analyse(type, content);
     const preview = content.length > 80 ? content.slice(0, 77) + '...' : content;
-
-    const manipTactics = matches.filter(m =>
-      [...URGENCY, ...CREDENTIALS, ...REWARDS].some(p => p.label === m.label)
-    ).length;
-
-    const breakdown = {
-      pattern_matches: positiveMatches.length,
-      manipulation_tactics: manipTactics,
-      match_rate_pct: Math.min(99, score + 10),
-    };
-
-    const isThreat = score > 50;
+    const isThreat = analysis.risk_score > 50;
     const xpAwarded = XP_PER_SCAN + (isThreat ? XP_THREAT_BONUS : 0);
     const scannedAt = new Date().toISOString();
 
     if (isMockMode) {
       return {
         scan_id: `scan-${Date.now()}`,
-        type, content_preview: preview, risk_score: score,
-        threat_level: level as ScanResult['threat_level'],
-        classification: cls, confidence_score: conf,
-        suspicious_elements: elements, red_flags: flags,
-        recommended_actions: actions, analysis_breakdown: breakdown,
-        xp_awarded: xpAwarded, newly_earned_badges: [], scanned_at: scannedAt,
+        type, content_preview: preview,
+        ...analysis,
+        xp_awarded: xpAwarded,
+        newly_earned_badges: [],
+        scanned_at: scannedAt,
       };
     }
 
     const { data: row, error: insertErr } = await supabaseAdmin!
       .from('scan_history')
       .insert({
-        user_id: userId,
-        type,
-        content_preview: preview,
-        risk_score: score,
-        classification: cls,
-        threat_level: level,
-        confidence_score: conf,
-        result_data: { suspicious_elements: elements, red_flags: flags, recommended_actions: actions, analysis_breakdown: breakdown },
+        user_id: userId, type, content_preview: preview,
+        risk_score: analysis.risk_score,
+        classification: analysis.classification,
+        threat_level: analysis.threat_level,
+        confidence_score: analysis.confidence_score,
+        result_data: {
+          suspicious_elements: analysis.suspicious_elements,
+          red_flags: analysis.red_flags,
+          recommended_actions: analysis.recommended_actions,
+          analysis_breakdown: analysis.analysis_breakdown,
+        },
         xp_awarded: xpAwarded,
         scanned_at: scannedAt,
       })
@@ -300,25 +357,20 @@ export const scannerService = {
     await usersService.awardXp(userId, { amount: xpAwarded });
 
     const newlyEarnedBadges: string[] = [];
-
     if (isThreat) {
-      const isNew = await badgesService.awardBadge(userId, 'scam-slayer');
-      if (isNew) newlyEarnedBadges.push('scam-slayer');
+      if (await badgesService.awardBadge(userId, 'scam-slayer')) newlyEarnedBadges.push('scam-slayer');
     }
-
     if (type === 'url' || type === 'qr') {
-      const isNew = await badgesService.awardBadge(userId, 'qr-guardian');
-      if (isNew) newlyEarnedBadges.push('qr-guardian');
+      if (await badgesService.awardBadge(userId, 'qr-guardian')) newlyEarnedBadges.push('qr-guardian');
     }
 
     return {
       scan_id: row.id,
-      type, content_preview: preview, risk_score: score,
-      threat_level: level as ScanResult['threat_level'],
-      classification: cls, confidence_score: conf,
-      suspicious_elements: elements, red_flags: flags,
-      recommended_actions: actions, analysis_breakdown: breakdown,
-      xp_awarded: xpAwarded, newly_earned_badges: newlyEarnedBadges, scanned_at: scannedAt,
+      type, content_preview: preview,
+      ...analysis,
+      xp_awarded: xpAwarded,
+      newly_earned_badges: newlyEarnedBadges,
+      scanned_at: scannedAt,
     };
   },
 
@@ -350,10 +402,10 @@ export const scannerService = {
     if (error) throw new Error(`getStats: ${error.message}`);
     const rows = data ?? [];
     return {
-      total_scans: rows.length,
+      total_scans:   rows.length,
       threats_found: rows.filter(r => r.risk_score > 50).length,
-      safe_count: rows.filter(r => r.risk_score <= 50).length,
-      xp_earned: rows.reduce((s, r) => s + (r.xp_awarded ?? 0), 0),
+      safe_count:    rows.filter(r => r.risk_score <= 50).length,
+      xp_earned:     rows.reduce((s, r) => s + (r.xp_awarded ?? 0), 0),
     };
   },
 };
