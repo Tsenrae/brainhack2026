@@ -39,7 +39,7 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     likes: '',
     shares: '',
     comments: '',
-    video_url: '',
+    video_url: 'https://wmprswjrjodqgqujcqzk.supabase.co/storage/v1/object/public/videos/module1-video1-cpf-phone-scam.mp4',
     video_title: 'Incoming Call: "CPF Board Officer" About Suspicious Transactions',
     video_description:
       'A young man receives an unexpected call from an "Officer from the CPF Board Operations Centre" who informs him that $47,500 in suspicious transactions have been detected on his CPF account. The officer says his funds must be immediately transferred to a "CPF Safe Account" to prevent further losses — and asks him to confirm his NRIC and SingPass password to freeze the fraudulent activity.',
