@@ -129,7 +129,11 @@ export function CommunitySubmit() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // Reset file when tab changes
-  useEffect(() => { setSelectedFile(null); setDragOver(false); }, [activeTab]);
+  useEffect(() => {
+    setSelectedFile(null);
+    setDragOver(false);
+    setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+  }, [activeTab]);
 
   function handleFileSelect(file: File | null) {
     if (!file) return;
@@ -137,6 +141,8 @@ export function CommunitySubmit() {
     if (file.size > 10 * 1024 * 1024)   { setSubmitError('File must be under 10 MB.'); return; }
     setSubmitError(null);
     setSelectedFile(file);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -316,15 +322,35 @@ export function CommunitySubmit() {
                   onChange={e => handleFileSelect(e.target.files?.[0] ?? null)}
                 />
                 {selectedFile ? (
-                  <div className="rounded-2xl border-2 border-green-300 bg-green-50 p-6 flex items-center gap-4">
-                    <FileImage className="w-10 h-10 text-green-600 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-500">{(selectedFile.size / 1024).toFixed(0)} KB</p>
+                  <div className="rounded-2xl border-2 border-green-300 bg-green-50 overflow-hidden">
+                    {previewUrl && (
+                      <div className="relative bg-gray-900 flex items-center justify-center" style={{ maxHeight: 320 }}>
+                        <img
+                          src={previewUrl}
+                          alt="Preview"
+                          className="max-w-full object-contain"
+                          style={{ maxHeight: 320 }}
+                        />
+                        <button
+                          onClick={() => { setSelectedFile(null); if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); } }}
+                          className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="p-4 flex items-center gap-3">
+                      <FileImage className="w-6 h-6 text-green-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate text-sm">{selectedFile.name}</p>
+                        <p className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(0)} KB · Ready to submit</p>
+                      </div>
+                      {!previewUrl && (
+                        <button onClick={() => { setSelectedFile(null); }} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
-                    <button onClick={() => setSelectedFile(null)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors">
-                      <X className="w-5 h-5" />
-                    </button>
                   </div>
                 ) : (
                   <div
@@ -452,27 +478,39 @@ export function CommunitySubmit() {
             ) : (
               <div className="space-y-3">
                 {reports.slice(0, 5).map((r) => {
-                  const Icon  = TYPE_ICON[r.type];
-                  const meta  = STATUS_META[r.status];
+                  const Icon = TYPE_ICON[r.type];
+                  const meta = STATUS_META[r.status];
                   return (
-                    <div key={r.id} className="p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all">
-                      <div className="flex items-start gap-3 mb-2">
-                        <Icon className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate mb-1">{r.content_preview}</div>
-                          <div className="text-xs text-gray-400">{timeAgo(r.created_at)}</div>
-                        </div>
-                      </div>
-                      <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${meta.color}`}>
-                        <div className={`w-2 h-2 rounded-full ${meta.dot} animate-pulse`}></div>
-                        <span>{meta.label}</span>
-                      </div>
-                      {r.helped_protect_count > 0 && (
-                        <div className="mt-2 text-xs text-gray-600">
-                          <Shield className="w-3 h-3 inline mr-1" />
-                          Helped protect {r.helped_protect_count} people
+                    <div key={r.id} className="bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 overflow-hidden transition-all">
+                      {r.screenshot_url && (
+                        <div className="bg-gray-900 flex items-center justify-center" style={{ maxHeight: 120 }}>
+                          <img
+                            src={r.screenshot_url}
+                            alt="Submitted screenshot"
+                            className="w-full object-cover"
+                            style={{ maxHeight: 120 }}
+                          />
                         </div>
                       )}
+                      <div className="p-4">
+                        <div className="flex items-start gap-3 mb-2">
+                          <Icon className="w-5 h-5 text-gray-600 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate mb-1">{r.content_preview}</div>
+                            <div className="text-xs text-gray-400">{timeAgo(r.created_at)}</div>
+                          </div>
+                        </div>
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${meta.color}`}>
+                          <div className={`w-2 h-2 rounded-full ${meta.dot} animate-pulse`}></div>
+                          <span>{meta.label}</span>
+                        </div>
+                        {r.helped_protect_count > 0 && (
+                          <div className="mt-2 text-xs text-gray-600">
+                            <Shield className="w-3 h-3 inline mr-1" />
+                            Helped protect {r.helped_protect_count} people
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
