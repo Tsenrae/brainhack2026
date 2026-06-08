@@ -92,6 +92,7 @@ export function CommunitySubmit() {
   const [description, setDescription] = useState('');
   const [agreedToPrivacy, setAgreed]  = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl]    = useState<string | null>(null);
   const [dragOver, setDragOver]       = useState(false);
 
   const [submitting, setSubmitting]   = useState(false);
