@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 
-type ScanType = 'text' | 'url' | 'qr';
+type ScanType = 'text' | 'url' | 'qr' | 'upload';
 
 interface SuspiciousElement {
   element: string;
@@ -43,6 +43,16 @@ interface ScanResult {
   xp_awarded: number;
   newly_earned_badges?: string[];
   scanned_at: string;
+  url_metadata?: {
+    final_url: string;
+    redirect_count: number;
+    redirect_chain: string[];
+    domain_changed: boolean;
+    page_title: string;
+    status_code: number;
+  };
+  image_url?: string;
+  decoded_qr_url?: string;
 }
 
 const THREAT_LEVEL_LABELS: Record<string, string> = {
@@ -126,6 +136,7 @@ export function ScannerResults() {
   const {
     type, content_preview, risk_score, threat_level, classification,
     confidence_score, suspicious_elements, red_flags, recommended_actions,
+    url_metadata, image_url, decoded_qr_url,
     analysis_breakdown, xp_awarded, newly_earned_badges = [], scanned_at,
   } = result;
 
@@ -400,14 +411,73 @@ export function ScannerResults() {
           {/* Scanned Content Preview */}
           <div className="bg-white rounded-2xl p-6 border-2 border-gray-200">
             <h3 className="font-bold text-gray-900 mb-4">Scanned Content</h3>
+            {image_url && (type === 'upload' || type === 'qr') && (
+              <div className="mb-4 rounded-xl overflow-hidden border-2 border-gray-200 bg-gray-900">
+                <img src={image_url} alt="Scanned image" className="w-full object-contain max-h-48" />
+              </div>
+            )}
             <div className="p-4 bg-gray-50 rounded-xl border-2 border-gray-200 mb-4 max-h-48 overflow-y-auto">
               <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{content_preview}</p>
             </div>
+            {decoded_qr_url && (
+              <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl text-xs">
+                <p className="font-semibold text-purple-700 mb-1">QR Decoded URL</p>
+                <p className="text-purple-600 break-all">{decoded_qr_url}</p>
+              </div>
+            )}
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               <span>Scanned {scannedDate}</span>
             </div>
           </div>
+
+          {/* URL Metadata */}
+          {url_metadata && (type === 'url' || type === 'qr') && (
+            <div className="bg-white rounded-2xl p-6 border-2 border-gray-200">
+              <div className="flex items-center gap-2 mb-4">
+                <LinkIcon className="w-5 h-5 text-blue-600" />
+                <h3 className="font-bold text-gray-900">URL Analysis</h3>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-gray-500 flex-shrink-0">Redirects</span>
+                  <span className={`font-bold ${url_metadata.redirect_count > 3 ? 'text-red-600' : url_metadata.redirect_count > 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {url_metadata.redirect_count} {url_metadata.redirect_count > 3 ? '⚠ suspicious' : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-gray-500 flex-shrink-0">Domain changed</span>
+                  <span className={`font-bold ${url_metadata.domain_changed ? 'text-red-600' : 'text-green-600'}`}>
+                    {url_metadata.domain_changed ? 'Yes ⚠' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-gray-500 flex-shrink-0">HTTP status</span>
+                  <span className={`font-bold ${url_metadata.status_code >= 400 ? 'text-red-600' : 'text-gray-700'}`}>
+                    {url_metadata.status_code || 'N/A'}
+                  </span>
+                </div>
+                {url_metadata.page_title && (
+                  <div>
+                    <span className="text-gray-500">Page title</span>
+                    <p className="text-gray-700 font-medium mt-1 text-xs bg-gray-50 rounded-lg px-2 py-1.5">{url_metadata.page_title}</p>
+                  </div>
+                )}
+                {url_metadata.redirect_chain.length > 1 && (
+                  <div>
+                    <span className="text-gray-500">Redirect chain</span>
+                    <div className="mt-1 space-y-1">
+                      {url_metadata.redirect_chain.map((u, i) => (
+                        <div key={i} className="text-xs bg-gray-50 rounded px-2 py-1 break-all text-gray-600">
+                          {i > 0 && <span className="text-gray-400 mr-1">↳</span>}{u}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* AI Analysis Breakdown */}
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">

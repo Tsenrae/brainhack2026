@@ -7,26 +7,28 @@ interface AuthPayload { userId: string; email: string; }
 
 async function extractAuth(req: Request, res: Response): Promise<AuthPayload | null> {
   if (isMockMode) return { userId: 'mock-user-id-001', email: 'mock@example.com' };
-
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing or invalid Authorization header' });
-    return null;
-  }
-
+  if (!header?.startsWith('Bearer ')) { res.status(401).json({ error: 'Missing or invalid Authorization header' }); return null; }
   const token = header.slice(7);
   const { data: { user }, error } = await supabaseAdmin!.auth.getUser(token);
-  if (error || !user) {
-    res.status(401).json({ error: 'Invalid or expired token' });
-    return null;
-  }
+  if (error || !user) { res.status(401).json({ error: 'Invalid or expired token' }); return null; }
   return { userId: user.id, email: user.email ?? '' };
 }
 
+const MAX_IMAGE_B64 = 15 * 1024 * 1024; // ~15 MB encoded
+
 const scanSchema = z.object({
-  type: z.enum(['text', 'url', 'qr']),
-  content: z.string().min(1).max(5000),
-});
+  type:           z.enum(['text', 'url', 'qr', 'upload']),
+  content:        z.string().max(5000).optional(),
+  image_base64:   z.string().max(MAX_IMAGE_B64).optional(),
+  image_mime:     z.string().max(64).optional(),
+  image_name:     z.string().max(255).optional(),
+}).refine(data => {
+  if (data.type === 'text' || data.type === 'url') return !!data.content?.trim();
+  if (data.type === 'upload') return !!data.image_base64;
+  if (data.type === 'qr') return !!(data.content?.trim() || data.image_base64);
+  return true;
+}, { message: 'text/url require content; upload requires image; qr requires content or image' });
 
 export const scannerController = {
   async scan(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -36,11 +38,18 @@ export const scannerController = {
 
       const parsed = scanSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+        res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Validation failed' });
         return;
       }
 
-      const data = await scannerService.scan(auth.userId, parsed.data.type, parsed.data.content);
+      const { type, content, image_base64, image_mime, image_name } = parsed.data;
+      const data = await scannerService.scan(auth.userId, {
+        type,
+        content,
+        imageBase64: image_base64,
+        imageMime:   image_mime,
+        imageName:   image_name,
+      });
       res.json({ data });
     } catch (err) {
       next(err);
@@ -53,9 +62,7 @@ export const scannerController = {
       if (!auth) return;
       const data = await scannerService.getHistory(auth.userId);
       res.json({ data });
-    } catch (err) {
-      next(err);
-    }
+    } catch (err) { next(err); }
   },
 
   async getStats(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -64,8 +71,6 @@ export const scannerController = {
       if (!auth) return;
       const data = await scannerService.getStats(auth.userId);
       res.json({ data });
-    } catch (err) {
-      next(err);
-    }
+    } catch (err) { next(err); }
   },
 };
