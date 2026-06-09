@@ -10,6 +10,7 @@ import { squadsRouter } from './routes/squads.routes.js';
 import { reportsRouter } from './routes/reports.routes.js';
 import { scenariosRouter } from './routes/scenarios.routes.js';
 import { telegramRouter } from './routes/telegram.routes.js';
+import { heatmapRouter } from './routes/heatmap.routes.js';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 5000);
@@ -33,6 +34,7 @@ app.use('/api/squads', squadsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/scenarios', scenariosRouter);
 app.use('/api/integrations/telegram', telegramRouter);
+app.use('/api/heatmap', heatmapRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

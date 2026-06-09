@@ -16,6 +16,7 @@ const submitSchema = z.object({
   type: z.enum(['screenshot', 'url', 'text', 'qr']),
   content: z.string().max(2000).optional(),
   description: z.string().max(500).optional(),
+  region: z.enum(['central', 'north', 'northeast', 'east', 'west']).optional(),
   screenshot_base64: z.string().max(10_000_000).optional(), // ~7.5 MB file
   screenshot_mime: z.string().optional(),
   screenshot_name: z.string().max(255).optional(),

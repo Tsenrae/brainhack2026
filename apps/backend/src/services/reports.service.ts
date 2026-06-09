@@ -2,6 +2,7 @@ import { supabaseAdmin, isMockMode } from '../config/supabase.js';
 import { usersService } from './users.service.js';
 import type {
   CommunityReport,
+  ReportRegion,
   ReportStats,
   ReportType,
   SubmitReportPayload,
@@ -19,6 +20,7 @@ const MOCK_REPORTS: CommunityReport[] = [
     content_preview: 'Free iPhone giveaway scam...',
     description: 'Received on WhatsApp',
     screenshot_url: null,
+    region: 'west',
     status: 'community_verified',
     helped_protect_count: 234,
     xp_awarded: 50,
@@ -30,6 +32,7 @@ const MOCK_REPORTS: CommunityReport[] = [
     content_preview: 'fake-gov-sg.xyz',
     description: null,
     screenshot_url: null,
+    region: 'central',
     status: 'shield_squad',
     helped_protect_count: 89,
     xp_awarded: 50,
@@ -41,6 +44,7 @@ const MOCK_REPORTS: CommunityReport[] = [
     content_preview: 'WhatsApp phishing attempt',
     description: 'Claimed to be from my bank',
     screenshot_url: null,
+    region: null,
     status: 'pending',
     helped_protect_count: 0,
     xp_awarded: 50,
@@ -83,7 +87,7 @@ async function uploadScreenshot(
 // ── Service ────────────────────────────────────────────────────────────────────
 export const reportsService = {
   async submit(userId: string, payload: SubmitReportPayload): Promise<SubmitReportResult> {
-    const { type, content, description, screenshot_base64, screenshot_mime, screenshot_name } = payload;
+    const { type, content, description, region, screenshot_base64, screenshot_mime, screenshot_name } = payload;
 
     const preview = buildPreview(type, content, screenshot_name);
 
@@ -94,6 +98,7 @@ export const reportsService = {
         content_preview: preview,
         description: description ?? null,
         screenshot_url: null,
+        region: region ?? null,
         status: 'pending',
         helped_protect_count: 0,
         xp_awarded: XP_PER_REPORT,
@@ -112,6 +117,7 @@ export const reportsService = {
         type,
         content_preview: preview,
         description: description ?? null,
+        region: region ?? null,
         status: 'pending',
         xp_awarded: XP_PER_REPORT,
       })
@@ -143,6 +149,7 @@ export const reportsService = {
       content_preview: preview,
       description: description ?? null,
       screenshot_url: screenshotUrl,
+      region: region ?? null,
       status: 'pending',
       helped_protect_count: 0,
       xp_awarded: XP_PER_REPORT,
@@ -157,7 +164,7 @@ export const reportsService = {
 
     const { data, error } = await supabaseAdmin!
       .from('community_reports')
-      .select('id, type, content_preview, description, screenshot_url, status, helped_protect_count, xp_awarded, created_at')
+      .select('id, type, content_preview, description, screenshot_url, region, status, helped_protect_count, xp_awarded, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(20);
@@ -170,6 +177,7 @@ export const reportsService = {
       content_preview: r.content_preview,
       description: r.description,
       screenshot_url: r.screenshot_url,
+      region: (r.region as ReportRegion | null) ?? null,
       status: r.status,
       helped_protect_count: r.helped_protect_count,
       xp_awarded: r.xp_awarded,

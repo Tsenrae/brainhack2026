@@ -1,7 +1,7 @@
 import {
   Upload, Link as LinkIcon, QrCode, MessageSquare, AlertCircle, Shield,
   CheckCircle, Users, Clock, TrendingUp, Eye, EyeOff, Info, ArrowLeft,
-  Zap, FileImage, Loader2, X,
+  Zap, FileImage, Loader2, X, MapPin,
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -11,6 +11,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type ReportType   = 'screenshot' | 'url' | 'text' | 'qr';
+type ReportRegion = 'central' | 'north' | 'northeast' | 'east' | 'west';
 type ReportStatus = 'pending' | 'ai_reviewing' | 'community_verified' | 'shield_squad' | 'rejected';
 
 interface CommunityReport {
@@ -90,6 +91,7 @@ export function CommunitySubmit() {
   const [urlInput, setUrlInput]       = useState('');
   const [textInput, setTextInput]     = useState('');
   const [description, setDescription] = useState('');
+  const [region, setRegion]           = useState<ReportRegion | null>(null);
   const [agreedToPrivacy, setAgreed]  = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl]    = useState<string | null>(null);
@@ -159,6 +161,7 @@ export function CommunitySubmit() {
     try {
       const body: Record<string, string> = { type: activeTab };
       if (description.trim()) body.description = description.trim();
+      if (region) body.region = region;
 
       if (activeTab === 'url')  body.content = urlInput.trim();
       if (activeTab === 'text') body.content = textInput.trim();
@@ -188,7 +191,7 @@ export function CommunitySubmit() {
   function resetForm() {
     setSubmitted(false);
     setUrlInput(''); setTextInput(''); setDescription('');
-    setAgreed(false); setSelectedFile(null); setSubmitError(null);
+    setRegion(null); setAgreed(false); setSelectedFile(null); setSubmitError(null);
   }
 
   // ── Success view ─────────────────────────────────────────────────────────────
@@ -406,6 +409,37 @@ export function CommunitySubmit() {
               rows={4}
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none resize-none"
             />
+          </div>
+
+          {/* Region picker */}
+          <div className="bg-white rounded-2xl p-6 border-2 border-gray-200">
+            <div className="flex items-center gap-2 mb-1">
+              <MapPin className="w-5 h-5 text-gray-700" />
+              <h3 className="font-bold text-gray-900">Where did you encounter this? <span className="font-normal text-gray-400 text-sm">(optional)</span></h3>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Helps us map threats across Singapore — no exact location is collected.</p>
+            <div className="grid grid-cols-5 gap-2">
+              {([
+                ['central',   'Central'],
+                ['north',     'North'],
+                ['northeast', 'North-East'],
+                ['east',      'East'],
+                ['west',      'West'],
+              ] as [ReportRegion, string][]).map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setRegion(prev => prev === val ? null : val)}
+                  className={`py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    region === val
+                      ? 'bg-red-600 border-red-600 text-white shadow-md'
+                      : 'bg-white border-gray-200 text-gray-700 hover:border-red-300 hover:bg-red-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Privacy checkbox */}

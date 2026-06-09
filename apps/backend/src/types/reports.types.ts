@@ -1,12 +1,15 @@
 export type ReportType   = 'screenshot' | 'url' | 'text' | 'qr';
 export type ReportStatus = 'pending' | 'ai_reviewing' | 'community_verified' | 'shield_squad' | 'rejected';
 
+export type ReportRegion = 'central' | 'north' | 'northeast' | 'east' | 'west';
+
 export interface CommunityReport {
   id: string;
   type: ReportType;
   content_preview: string;
   description: string | null;
   screenshot_url: string | null;
+  region: ReportRegion | null;
   status: ReportStatus;
   helped_protect_count: number;
   xp_awarded: number;
@@ -23,6 +26,7 @@ export interface SubmitReportPayload {
   type: ReportType;
   content?: string;
   description?: string;
+  region?: ReportRegion;
   screenshot_base64?: string;
   screenshot_mime?: string;
   screenshot_name?: string;
