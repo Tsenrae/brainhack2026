@@ -1,0 +1,10 @@
+-- Scanner uploads are stored in Supabase Storage, not a SQL table.
+-- Create the storage bucket manually in your Supabase dashboard:
+--
+--   Storage → New Bucket
+--   Name:   scanner-uploads
+--   Public: true (so image_url can be displayed in results)
+--
+-- File paths: {userId}/{timestamp}-{random}.{ext}
+-- Bucket policy: authenticated users can insert their own files.
+-- (No SQL changes needed — the backend uses the service role key which bypasses RLS.)
