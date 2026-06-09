@@ -39,7 +39,7 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     likes: '',
     shares: '',
     comments: '',
-    video_url: '',
+    video_url: 'https://wmprswjrjodqgqujcqzk.supabase.co/storage/v1/object/public/videos/module1-video1-cpf-phone-scam.mp4',
     video_title: 'Incoming Call: "CPF Board Officer" About Suspicious Transactions',
     video_description:
       'A young man receives an unexpected call from an "Officer from the CPF Board Operations Centre" who informs him that $47,500 in suspicious transactions have been detected on his CPF account. The officer says his funds must be immediately transferred to a "CPF Safe Account" to prevent further losses — and asks him to confirm his NRIC and SingPass password to freeze the fraudulent activity.',
@@ -129,7 +129,7 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     likes: '',
     shares: '',
     comments: '',
-    video_url: '',
+    video_url: 'https://wmprswjrjodqgqujcqzk.supabase.co/storage/v1/object/public/videos/module1-video2-fake-grant-temp.mp4',
     video_title: 'VIRAL: "Ministry of Finance" Announces $1,500 Recovery Package for All Singaporeans',
     video_description:
       'A smartly-dressed person sits at a professional-looking desk with a Singapore flag visible in the background. Speaking in an authoritative tone, they introduce themselves as representing the Ministry of Finance and announce a "$1,500 Singapore Recovery Assistance Package" available to all eligible Singaporeans. The video shows an official-looking graphic and asks viewers to visit a link to claim their payment — but warns that slots are limited and the offer closes in 48 hours.',
@@ -201,7 +201,7 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     likes: '',
     shares: '',
     comments: '',
-    video_url: '',
+    video_url: 'https://wmprswjrjodqgqujcqzk.supabase.co/storage/v1/object/public/videos/module1-video3-investment-scam.mp4',
     video_title: 'He Made $8,200 in 14 Days — Singapore Trading Group Exposed?',
     video_description:
       'An enthusiastic young Singaporean in his 20s films himself talking directly to camera in a casual home setting. He shows his phone screen displaying a trading app with a $8,247 profit balance and excitedly explains how he achieved it through a Telegram channel run by a "trading sifu" from Hong Kong. He says the basic channel is free to join, but premium signals — which he credits for all his profits — cost $200/month, with a "100% guaranteed returns or refund" promise. He urges viewers to join quickly as only 50 new members are accepted per month.',
