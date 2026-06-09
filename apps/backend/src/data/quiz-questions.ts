@@ -201,7 +201,7 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     likes: '',
     shares: '',
     comments: '',
-    video_url: '',
+    video_url: 'https://wmprswjrjodqgqujcqzk.supabase.co/storage/v1/object/public/videos/module1-video3-investment-scam.mp4',
     video_title: 'He Made $8,200 in 14 Days — Singapore Trading Group Exposed?',
     video_description:
       'An enthusiastic young Singaporean in his 20s films himself talking directly to camera in a casual home setting. He shows his phone screen displaying a trading app with a $8,247 profit balance and excitedly explains how he achieved it through a Telegram channel run by a "trading sifu" from Hong Kong. He says the basic channel is free to join, but premium signals — which he credits for all his profits — cost $200/month, with a "100% guaranteed returns or refund" promise. He urges viewers to join quickly as only 50 new members are accepted per month.',
