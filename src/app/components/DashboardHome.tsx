@@ -3,18 +3,21 @@ import { Flame, ArrowRight, Shield, Zap, CheckCircle, Target, ScanLine, Heart, M
 import { Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 
-const recentScans = [
-  { type: "WhatsApp Message", result: "Safe", time: "2 hours ago", confidence: 98 },
-  { type: "QR Code", result: "Warning", time: "5 hours ago", confidence: 75 },
-  { type: "Email Link", result: "Safe", time: "1 day ago", confidence: 95 }
-];
-
 interface BadgeFromApi {
   badge_slug: string;
   badge_name: string;
   description: string;
   xp_reward: number;
   earned: boolean;
+}
+
+interface ScanHistoryItem {
+  scan_id: string;
+  type: 'text' | 'url' | 'qr' | 'upload';
+  content_preview: string;
+  risk_score: number;
+  classification: string;
+  scanned_at: string;
 }
 
 // Emoji fallback for dashboard mini-grid
@@ -31,18 +34,83 @@ const BADGE_EMOJI: Record<string, string> = {
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function scanVisual(scan: ScanHistoryItem) {
+  if (scan.risk_score > 70) {
+    return {
+      result: 'Threat',
+      bg: 'bg-red-100',
+      text: 'text-red-600',
+      icon: Shield,
+    };
+  }
+  if (scan.risk_score > 40) {
+    return {
+      result: 'Warning',
+      bg: 'bg-yellow-100',
+      text: 'text-yellow-600',
+      icon: Shield,
+    };
+  }
+  return {
+    result: 'Safe',
+    bg: 'bg-green-100',
+    text: 'text-green-600',
+    icon: CheckCircle,
+  };
+}
+
 export function DashboardHome() {
-  const { profile, session } = useAuth();
+  const { profile, session, missionStatus } = useAuth();
   const [apiBadges, setApiBadges] = useState<BadgeFromApi[]>([]);
+  const [recentScans, setRecentScans] = useState<ScanHistoryItem[]>([]);
+  const [recentScansLoading, setRecentScansLoading] = useState(true);
 
   useEffect(() => {
     if (!session) return;
+
     fetch(`${BACKEND_URL}/api/badges`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     })
-      .then(r => r.json())
-      .then(({ data }) => { if (data) setApiBadges(data); })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Badges request failed: ${r.status}`);
+        return r.json();
+      })
+      .then(({ data }) => { if (data) setApiBadges(data as BadgeFromApi[]); })
       .catch(console.error);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session) {
+      setRecentScans([]);
+      setRecentScansLoading(false);
+      return;
+    }
+
+    setRecentScansLoading(true);
+    fetch(`${BACKEND_URL}/api/scanner/history`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Scanner history request failed: ${r.status}`);
+        return r.json();
+      })
+      .then(({ data }) => {
+        setRecentScans((data as ScanHistoryItem[] | undefined) ?? []);
+      })
+      .catch((error) => {
+        console.error(error);
+        setRecentScans([]);
+      })
+      .finally(() => setRecentScansLoading(false));
   }, [session]);
 
   // Show earned first, then locked; cap to 6 for the mini grid
@@ -56,6 +124,24 @@ export function DashboardHome() {
     ? Math.min(100, Math.round(((profile.xp - profile.current_level_xp) / levelRange) * 100))
     : 0;
   const xpToNext = profile ? profile.next_level_xp - profile.xp : 0;
+
+  const modules = missionStatus?.modules ?? [];
+  const completedModules = modules.filter((m) => m.status === 'completed').length;
+  const overallMissionProgress = missionStatus?.overall_progress_pct ?? 0;
+
+  const nextMissionPath =
+    modules.find((m) => m.status !== 'completed')?.module_slug === 'chain-reaction'
+      ? '/mission/digital-shield/chain-reaction'
+      : modules.find((m) => m.status !== 'completed')?.module_slug === 'shield-squad'
+      ? '/mission/digital-shield/shield-squad'
+      : '/mission/digital-shield/spot-the-spin';
+
+  const missionButtonLabel =
+    missionStatus?.completed
+      ? 'Review Mission'
+      : overallMissionProgress > 0
+      ? 'Continue Mission'
+      : 'Start Mission';
 
   return (
     <div className="p-8 space-y-8">
@@ -122,7 +208,7 @@ export function DashboardHome() {
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <CheckCircle className="w-8 h-8 text-blue-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">{profile?.missions_completed ?? 0}</div>
+              <div className="text-2xl font-bold text-gray-900">{completedModules}</div>
               <div className="text-xs text-gray-600">Completed</div>
             </div>
           </div>
@@ -134,7 +220,7 @@ export function DashboardHome() {
         <h2 className="text-xl font-bold text-gray-900 mb-4">Start Your Mission</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Mission 1: Digital Shield */}
-          <Link to="/mission/digital-shield" className="bg-white rounded-2xl p-6 border-2 border-red-200 hover:border-red-400 hover:shadow-xl transition-all cursor-pointer group block">
+          <Link to={nextMissionPath} className="bg-white rounded-2xl p-6 border-2 border-red-200 hover:border-red-400 hover:shadow-xl transition-all cursor-pointer group block">
             <div className="flex items-start justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Shield className="w-6 h-6 text-white" />
@@ -161,14 +247,20 @@ export function DashboardHome() {
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Progress</span>
-                <span className="font-bold text-gray-900">65%</span>
+                <span className="font-bold text-gray-900">{overallMissionProgress}%</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2">
-                <div className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full" style={{ width: '65%' }}></div>
+                <div
+                  className="bg-gradient-to-r from-red-500 to-orange-500 h-2 rounded-full"
+                  style={{ width: `${overallMissionProgress}%` }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {completedModules} of 3 modules completed
               </div>
             </div>
             <div className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors text-center">
-              Continue Mission
+              {missionButtonLabel}
             </div>
           </Link>
 
@@ -283,39 +375,42 @@ export function DashboardHome() {
         <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-gray-900">Recent Scans</h3>
-            <a href="#" className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
+            <Link to="/scanner" className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
               View All <ArrowRight className="w-4 h-4" />
-            </a>
+            </Link>
           </div>
-          <div className="space-y-3">
-            {recentScans.map((scan, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    scan.result === 'Safe' ? 'bg-green-100' : 'bg-yellow-100'
-                  }`}>
-                    {scan.result === 'Safe' ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Shield className="w-5 h-5 text-yellow-600" />
-                    )}
+          {recentScansLoading ? (
+            <div className="py-8 text-sm text-gray-500 text-center">Loading scans...</div>
+          ) : recentScans.length === 0 ? (
+            <div className="py-8 text-sm text-gray-500 text-center">No scans yet.</div>
+          ) : (
+            <div className="space-y-3">
+              {recentScans.slice(0, 5).map((scan) => {
+                const visual = scanVisual(scan);
+                const Icon = visual.icon;
+
+                return (
+                  <div key={scan.scan_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${visual.bg}`}>
+                        <Icon className={`w-5 h-5 ${visual.text}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{scan.content_preview}</div>
+                        <div className="text-xs text-gray-500">
+                          {scan.type.toUpperCase()} · {relativeTime(scan.scanned_at)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`text-sm font-bold ${visual.text}`}>{visual.result}</div>
+                      <div className="text-xs text-gray-500">{scan.risk_score}% risk</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{scan.type}</div>
-                    <div className="text-xs text-gray-500">{scan.time}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`text-sm font-bold ${
-                    scan.result === 'Safe' ? 'text-green-600' : 'text-yellow-600'
-                  }`}>
-                    {scan.result}
-                  </div>
-                  <div className="text-xs text-gray-500">{scan.confidence}% confidence</div>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Badge Showcase */}

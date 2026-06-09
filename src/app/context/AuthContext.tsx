@@ -39,11 +39,30 @@ export interface CreateProfilePayload {
   subscribe_updates: boolean;
 }
 
+export type ModuleStatus = 'not_started' | 'in_progress' | 'completed';
+
+export interface ModuleProgress {
+  module_slug: string;
+  status: ModuleStatus;
+  correct_count: number;
+  wrong_count: number;
+  last_question_index: number;
+  completed_at: string | null;
+}
+
+export interface MissionStatusResponse {
+  modules: ModuleProgress[];
+  overall_progress_pct: number;
+  completed: boolean;
+}
+
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   profile: UserProfile | null;
+  missionStatus: MissionStatusResponse | null;
   loading: boolean;
+  missionLoading: boolean;
   needsProfile: boolean;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -51,6 +70,7 @@ interface AuthContextValue {
   createProfile: (payload: CreateProfilePayload, accessToken?: string) => Promise<UserProfile>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  refreshMissionStatus: () => Promise<MissionStatusResponse | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -71,23 +91,70 @@ async function fetchProfileFromBackend(token: string): Promise<UserProfile | nul
   }
 }
 
+async function fetchMissionStatusFromBackend(token: string): Promise<MissionStatusResponse | null> {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/missions/digital-shield`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const { data } = await res.json();
+    return data as MissionStatusResponse;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [missionStatus, setMissionStatus] = useState<MissionStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [missionLoading, setMissionLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
+
+  async function refreshMissionStatus(): Promise<MissionStatusResponse | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setMissionStatus(null);
+      return null;
+    }
+
+    setMissionLoading(true);
+    const status = await fetchMissionStatusFromBackend(session.access_token);
+    setMissionStatus(status);
+    setMissionLoading(false);
+    return status;
+  }
+
+  async function hydrateSessionData(activeSession: Session, event?: string): Promise<void> {
+    setMissionLoading(true);
+
+    const [profileResult, missionResult] = await Promise.all([
+      fetchProfileFromBackend(activeSession.access_token),
+      fetchMissionStatusFromBackend(activeSession.access_token),
+    ]);
+
+    setProfile(profileResult);
+    setMissionStatus(missionResult);
+    setMissionLoading(false);
+
+    if (profileResult === null && event === 'SIGNED_IN' && !window.location.pathname.includes('/signup')) {
+      window.location.href = '/signup?complete=1';
+    } else {
+      setNeedsProfile(profileResult === null);
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session) {
-        fetchProfileFromBackend(session.access_token).then(p => {
-          setProfile(p);
-          setNeedsProfile(p === null);
-        }).finally(() => setLoading(false));
+        hydrateSessionData(session).finally(() => setLoading(false));
       } else {
+        setMissionStatus(null);
+        setMissionLoading(false);
         setLoading(false);
       }
     });
@@ -98,16 +165,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session) {
-          const p = await fetchProfileFromBackend(session.access_token);
-          setProfile(p);
-          // OAuth users who don't have a profile yet get redirected to finish sign-up
-          if (p === null && event === 'SIGNED_IN' && !window.location.pathname.includes('/signup')) {
-            window.location.href = '/signup?complete=1';
-          } else {
-            setNeedsProfile(p === null);
-          }
+          await hydrateSessionData(session, event);
         } else {
           setProfile(null);
+          setMissionStatus(null);
+          setMissionLoading(false);
           setNeedsProfile(false);
         }
       },
@@ -173,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut(): Promise<void> {
     await supabase.auth.signOut();
     setProfile(null);
+    setMissionStatus(null);
     setNeedsProfile(false);
   }
 
@@ -189,7 +252,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user,
         profile,
+        missionStatus,
         loading,
+        missionLoading,
         needsProfile,
         signInWithEmail,
         signInWithGoogle,
@@ -197,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createProfile,
         signOut,
         refreshProfile,
+        refreshMissionStatus,
       }}
     >
       {children}

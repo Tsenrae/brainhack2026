@@ -1,5 +1,6 @@
 import { CheckCircle, AlertTriangle, Brain, Shield, Zap, ArrowRight, Lightbulb, Target, TrendingUp, Award } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { useAuth } from '../context/AuthContext';
 
 type QuizAnswerType = 'real' | 'misleading' | 'satire' | 'scam';
 
@@ -51,6 +52,7 @@ const ANSWER_LABELS: Record<QuizAnswerType, string> = {
 export function QuizFeedback() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { refreshMissionStatus, refreshProfile } = useAuth();
   const result = location.state as AnswerResult | null;
 
   // Fallback if navigated here directly without state
@@ -69,8 +71,12 @@ export function QuizFeedback() {
   const totalAnswered = correct_count + wrong_count;
   const xpPenalty = 50 - xp_awarded;
 
-  function handleContinue() {
+  async function handleContinue() {
     if (session_complete) {
+      await Promise.all([
+        refreshMissionStatus(),
+        refreshProfile(),
+      ]);
       navigate('/mission/digital-shield/complete');
     } else {
       navigate('/mission/digital-shield/spot-the-spin');

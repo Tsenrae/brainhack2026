@@ -1,24 +1,7 @@
 import { Shield, Clock, Zap, Trophy, Target, Link2, Users, CheckCircle, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Link as RouterLink } from 'react-router';
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-
-type ModuleStatus = 'not_started' | 'in_progress' | 'completed';
-
-interface ModuleProgress {
-  module_slug: string;
-  status: ModuleStatus;
-  correct_count: number;
-  wrong_count: number;
-  last_question_index: number;
-  completed_at: string | null;
-}
-
-interface MissionStatusResponse {
-  modules: ModuleProgress[];
-  overall_progress_pct: number;
-  completed: boolean;
-}
+import { useAuth, type ModuleProgress, type ModuleStatus } from '../context/AuthContext';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
@@ -72,30 +55,34 @@ const BADGE_META = [
 ];
 
 export function MissionHub() {
-  const { session } = useAuth();
-  const [missionStatus, setMissionStatus] = useState<MissionStatusResponse | null>(null);
+  const { session, missionStatus, missionLoading } = useAuth();
   const [badgesEarned, setBadgesEarned] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [badgesLoading, setBadgesLoading] = useState(true);
 
   useEffect(() => {
-    if (!session) { setLoading(false); return; }
+    if (!session) { setBadgesLoading(false); return; }
 
     const headers = { Authorization: `Bearer ${session.access_token}` };
 
-    Promise.all([
-      fetch(`${BACKEND_URL}/api/missions/digital-shield`, { headers }).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/missions/digital-shield/badges`, { headers }).then(r => r.json()),
-    ]).then(([missionRes, badgesRes]) => {
-      if (missionRes.data) setMissionStatus(missionRes.data);
-      if (badgesRes.data) {
-        setBadgesEarned(new Set(
-          (badgesRes.data as Array<{ badge_slug: string; earned: boolean }>)
-            .filter(b => b.earned)
-            .map(b => b.badge_slug),
-        ));
-      }
-    }).catch(console.error).finally(() => setLoading(false));
+    fetch(`${BACKEND_URL}/api/badges`, { headers })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Badges request failed: ${r.status}`);
+        return r.json();
+      })
+      .then((badgesRes) => {
+        if (badgesRes.data) {
+          setBadgesEarned(new Set(
+            (badgesRes.data as Array<{ badge_slug: string; earned: boolean }>)
+              .filter(b => b.earned)
+              .map(b => b.badge_slug),
+          ));
+        }
+      })
+      .catch(console.error)
+      .finally(() => setBadgesLoading(false));
   }, [session]);
+
+  const loading = missionLoading || badgesLoading;
 
   const getModuleProgress = (slug: string): ModuleProgress | null =>
     missionStatus?.modules.find(m => m.module_slug === slug) ?? null;
@@ -227,11 +214,17 @@ export function MissionHub() {
               <div
                 key={module.slug}
                 className={`relative bg-white rounded-2xl p-6 border-2 transition-all ${
+                  isLocked
+                    ? 'border-gray-200 opacity-60'
+                    : status === 'not_started'
+                    ? 'border-gray-200 hover:border-gray-300'
+                    : ''
+                } ${
                   status === 'in_progress'
                     ? 'border-red-300 shadow-lg'
-                    : status === 'completed'
+                  : status === 'completed'
                     ? 'border-green-300'
-                    : 'border-gray-200 opacity-60'
+                    : ''
                 }`}
               >
                 <div className="absolute -top-3 -left-3 w-10 h-10 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
