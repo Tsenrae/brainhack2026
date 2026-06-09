@@ -4,7 +4,7 @@ import type {
   ScanRedFlag,
   SuspiciousElement,
   ThreatLevel,
-} from './scanner.types.js';
+} from "./scanner.types.js";
 
 export interface TelegramMissionRecommendation {
   title: string;
@@ -46,7 +46,7 @@ export interface TelegramAnalyzeRequest {
   message_id?: string | number | null;
   chat_id?: string | number | null;
   chat_title?: string | null;
-  source?: 'bot' | 'web';
+  source?: "bot" | "web";
 }
 
 export interface TelegramAnalysisResponse {
@@ -70,7 +70,7 @@ export interface TelegramRecentScan {
   classification: string;
   threat_level: ThreatLevel;
   timestamp: string;
-  color: 'red' | 'yellow' | 'green';
+  color: "red" | "yellow" | "green";
 }
 
 export interface TelegramScanHistoryItem {

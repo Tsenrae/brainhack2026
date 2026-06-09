@@ -247,21 +247,35 @@ async function analyzeWithGroq(
 
 // ── Vision analysis via Groq multimodal ──────────────────────────────────────
 
-async function analyzeWithVision(base64: string, mime: string): Promise<LLMAnalysis> {
+async function analyzeWithVision(
+  base64: string,
+  mime: string,
+): Promise<LLMAnalysis> {
   console.log(`[groq-vision] calling ${GROQ_VISION_MODEL} for image scan`);
   const completion = await groqClient!.chat.completions.create({
     model: GROQ_VISION_MODEL,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    messages: [{ role: 'user', content: [
-      { type: 'text', text: `${SYSTEM_PROMPT}\n\nAnalyse this screenshot/image for scams, phishing, or digital threats targeting Singapore users. Read all visible text carefully.` },
-      { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-    ] as any }],
-    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `${SYSTEM_PROMPT}\n\nAnalyse this screenshot/image for scams, phishing, or digital threats targeting Singapore users. Read all visible text carefully.`,
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:${mime};base64,${base64}` },
+          },
+        ] as any,
+      },
+    ],
+    response_format: { type: "json_object" },
     temperature: 0.1,
     max_tokens: 2048,
   });
   const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error('Groq vision returned empty response');
+  if (!raw) throw new Error("Groq vision returned empty response");
   return validateLLMResponse(JSON.parse(raw));
 }
 
@@ -815,10 +829,7 @@ const MOCK_STATS: ScannerStats = {
 // ── Service ────────────────────────────────────────────────────────────────────
 
 export const scannerService = {
-  async scan(
-    userId: string,
-    input: ScanInput,
-  ): Promise<ScanResult> {
+  async scan(userId: string, input: ScanInput): Promise<ScanResult> {
     const { type, content, imageBase64, imageMime, imageName } = input;
     const scannedAt = new Date().toISOString();
 
@@ -827,15 +838,18 @@ export const scannerService = {
 
     // Build content preview
     let preview: string;
-    if (type === 'upload') {
-      preview = imageName ? `Image: ${imageName}` : 'Uploaded image';
-    } else if (type === 'url' || type === 'qr') {
-      const displayUrl = decodedQrUrl ?? content ?? '';
+    if (type === "upload") {
+      preview = imageName ? `Image: ${imageName}` : "Uploaded image";
+    } else if (type === "url" || type === "qr") {
+      const displayUrl = decodedQrUrl ?? content ?? "";
       const finalUrl = urlMeta?.final_url ?? displayUrl;
       const label = decodedQrUrl ? `QR → ${finalUrl}` : finalUrl;
-      preview = label.length > 80 ? label.slice(0, 77) + '...' : label;
+      preview = label.length > 80 ? label.slice(0, 77) + "..." : label;
     } else {
-      preview = (content ?? '').length > 80 ? (content ?? '').slice(0, 77) + '...' : (content ?? '');
+      preview =
+        (content ?? "").length > 80
+          ? (content ?? "").slice(0, 77) + "..."
+          : (content ?? "");
     }
 
     const isThreat = llm.risk_score > 50;
@@ -854,7 +868,7 @@ export const scannerService = {
     }
 
     const { data: row, error: insertErr } = await supabaseAdmin!
-      .from('scan_history')
+      .from("scan_history")
       .insert({
         user_id: userId,
         type,
@@ -883,8 +897,13 @@ export const scannerService = {
     await usersService.awardXp(userId, { amount: xpAwarded });
 
     const newlyEarnedBadges: string[] = [];
-    if (isThreat && await badgesService.awardBadge(userId, 'scam-slayer')) newlyEarnedBadges.push('scam-slayer');
-    if ((type === 'url' || type === 'qr') && await badgesService.awardBadge(userId, 'qr-guardian')) newlyEarnedBadges.push('qr-guardian');
+    if (isThreat && (await badgesService.awardBadge(userId, "scam-slayer")))
+      newlyEarnedBadges.push("scam-slayer");
+    if (
+      (type === "url" || type === "qr") &&
+      (await badgesService.awardBadge(userId, "qr-guardian"))
+    )
+      newlyEarnedBadges.push("qr-guardian");
 
     return {
       scan_id: row.id,
