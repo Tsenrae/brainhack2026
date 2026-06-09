@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
+import QRCode from 'react-qr-code';
 
 interface TelegramBotInfo {
   username: string;
@@ -114,6 +115,8 @@ const SAMPLE_BOT_INFO: TelegramBotInfo = {
   username: '@ShieldVerseSG_bot',
   url: 'https://t.me/ShieldVerseSG_bot',
 };
+
+const BOT_QR_SIZE = 176;
 
 const exampleConversation = [
   {
@@ -249,6 +252,10 @@ export function TelegramBot() {
       ? 'Not linked yet'
       : 'Sign in to generate a link code';
 
+  const linkCodeHint = session
+    ? 'Generate a temporary code on this page, then send /link <code> in Telegram to attach your Telegram account to this ShieldVerse profile.'
+    : 'Sign in first to generate your personal link code.';
+
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
@@ -298,10 +305,20 @@ export function TelegramBot() {
             <div className="bg-white rounded-3xl p-8 shadow-2xl w-full max-w-sm text-gray-900">
               <div className="text-center mb-4">
                 <h3 className="font-bold text-gray-900 text-xl mb-2">Scan to Connect</h3>
-                <p className="text-sm text-gray-600">Search the bot or scan the QR placeholder</p>
+                <p className="text-sm text-gray-600">Scan the QR code to open the bot instantly</p>
               </div>
-              <div className="w-64 h-64 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center border-4 border-gray-300 mb-4">
-                <QrCode className="w-32 h-32 text-gray-400" />
+              <div className="w-64 h-64 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center border-4 border-gray-300 mb-4 overflow-hidden">
+                <div className="bg-white p-4 rounded-xl shadow-sm">
+                  <QRCode
+                    value={botInfo.url}
+                    size={BOT_QR_SIZE}
+                    fgColor="#1f2937"
+                    bgColor="#ffffff"
+                    level="M"
+                    style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
+                    aria-label={`QR code for ${botInfo.url}`}
+                  />
+                </div>
               </div>
               <div className="text-center space-y-3">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl">
@@ -309,6 +326,7 @@ export function TelegramBot() {
                   <span className="font-mono text-sm text-blue-700">{botInfo.username}</span>
                 </div>
                 <p className="text-xs text-gray-500">{linkedLabel}</p>
+                <p className="text-xs text-gray-600 leading-relaxed">{linkCodeHint}</p>
                 {linkCode && (
                   <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 text-left">
                     <div className="text-xs font-semibold uppercase tracking-wider text-purple-600 mb-2">Link code</div>
