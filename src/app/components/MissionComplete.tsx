@@ -234,17 +234,16 @@ export function MissionComplete() {
 
         {/* Action Buttons */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Link
-            to="/mission/cyber-warriors"
-            className="group relative overflow-hidden bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 rounded-xl p-6 border-2 border-red-400/30 hover:border-red-400/60 transition-all text-center"
+          <button
+            disabled
+            className="group relative overflow-hidden bg-slate-800/50 rounded-xl p-6 border-2 border-slate-700/50 cursor-not-allowed opacity-75 text-center"
           >
-            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
             <div className="relative">
-              <ArrowRight className="w-8 h-8 text-white mx-auto mb-3" />
-              <div className="font-bold text-white text-lg mb-1">Next Mission</div>
-              <div className="text-sm text-red-100">Cyber Warriors</div>
+              <ArrowRight className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+              <div className="font-bold text-slate-300 text-lg mb-1">Next Mission</div>
+              <div className="text-sm text-slate-400">Cyber Warriors (Coming Soon)</div>
             </div>
-          </Link>
+          </button>
 
           <button className="group relative overflow-hidden bg-white/10 hover:bg-white/20 backdrop-blur-lg rounded-xl p-6 border-2 border-white/20 hover:border-purple-400/60 transition-all text-center">
             <div className="absolute inset-0 bg-purple-500/10 translate-y-full group-hover:translate-y-0 transition-transform"></div>
