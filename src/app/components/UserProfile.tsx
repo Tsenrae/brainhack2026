@@ -121,7 +121,7 @@ export function UserProfile() {
         </div>
 
         <div className="px-6 pb-6">
-          <div className="flex items-end gap-4 -mt-10 mb-4">
+          <div className="flex items-end gap-4 -mt-10 mb-4 relative z-10">
             <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white font-bold text-2xl border-4 border-white shadow-lg flex-shrink-0`}>
               {initials}
             </div>
@@ -134,7 +134,7 @@ export function UserProfile() {
             <div className="pb-1 flex gap-2">
               <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 rounded-xl px-3 py-1.5">
                 <Flame className="w-4 h-4 text-red-600" />
-                <span className="text-red-700 font-bold text-sm">{profile?.streak_days ?? 0}-day streak</span>
+                <span className="text-red-700 font-bold text-sm">{profile?.streak_days || 1}-day streak</span>
               </div>
               <div className="flex items-center gap-1.5 bg-yellow-50 border border-yellow-200 rounded-xl px-3 py-1.5">
                 <Trophy className="w-4 h-4 text-yellow-600" />

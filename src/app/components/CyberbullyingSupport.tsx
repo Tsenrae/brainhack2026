@@ -1,11 +1,24 @@
-import { Heart, Upload, Shield, AlertCircle, Phone, MessageCircle, Users, CheckCircle, ArrowLeft, Eye, UserCheck, Hand, HeartHandshake, Book, Clock, Star, Info } from 'lucide-react';
+import { Heart, Upload, Shield, AlertCircle, Phone, MessageCircle, Users, CheckCircle, ArrowLeft, Eye, UserCheck, Hand, HeartHandshake, Book, Clock, Star, Info, FileImage, X } from 'lucide-react';
 import { Link } from 'react-router';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export function CyberbullyingSupport() {
   const [userRole, setUserRole] = useState<'victim' | 'bystander' | 'offender' | null>(null);
   const [description, setDescription] = useState('');
   const [showSupport, setShowSupport] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  function selectUploadFile(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return; }
+    if (file.size > 10 * 1024 * 1024)   { alert('File must be under 10 MB.'); return; }
+
+    setUploadFile(file);
+    setUploadPreview(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file); });
+  }
 
   const handleGetSupport = () => {
     if (userRole && description) {
@@ -574,11 +587,40 @@ export function CyberbullyingSupport() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Upload a screenshot (optional)
                     </label>
-                    <div className="border-2 border-dashed border-gray-300 hover:border-pink-400 rounded-xl p-8 text-center transition-all bg-gray-50 hover:bg-pink-50 cursor-pointer">
-                      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-sm text-gray-600 mb-1">Drag & drop screenshot here</p>
-                      <p className="text-xs text-gray-500">PNG, JPG (Max 10MB)</p>
-                    </div>
+                    <input ref={uploadInputRef} type="file" accept="image/*" className="hidden"
+                      onChange={e => selectUploadFile(e.target.files?.[0] ?? null)} />
+
+                    {uploadFile && uploadPreview ? (
+                      <div className="rounded-2xl border-2 border-pink-300 overflow-hidden mb-4">
+                        <div className="bg-gray-900 flex items-center justify-center relative" style={{ maxHeight: 280 }}>
+                          <img src={uploadPreview} alt="Preview" className="max-w-full object-contain" style={{ maxHeight: 280 }} />
+                          <button onClick={() => { setUploadFile(null); setUploadPreview(null); }}
+                            className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-lg">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="p-3 flex items-center gap-3 bg-pink-50">
+                          <FileImage className="w-5 h-5 text-pink-600" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{uploadFile.name}</p>
+                            <p className="text-xs text-gray-500">{(uploadFile.size / 1024).toFixed(0)} KB</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={e => { e.preventDefault(); setDragOver(false); selectUploadFile(e.dataTransfer.files[0] ?? null); }}
+                        onClick={() => uploadInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${dragOver ? 'border-red-400 bg-red-50' : 'border-gray-300 hover:border-red-400 bg-gray-50 hover:bg-red-50/40'}`}
+                      >
+                        <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-sm text-gray-600 mb-1">Drag & drop screenshot here</p>
+                        <p className="text-xs text-gray-500 mb-4">PNG, JPG (Max 10MB)</p>
+                        <span className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-xl inline-block">Choose Image</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Description */}

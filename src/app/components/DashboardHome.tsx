@@ -106,7 +106,7 @@ export function DashboardHome() {
               <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center mb-2 shadow-sm">
                 <Flame className="w-8 h-8 text-orange-500" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">{profile?.streak_days ?? 0}</div>
+              <div className="text-2xl font-bold text-gray-900">{profile?.streak_days || 1}</div>
               <div className="text-xs text-gray-600">Day Streak</div>
             </div>
             <div className="text-center">
