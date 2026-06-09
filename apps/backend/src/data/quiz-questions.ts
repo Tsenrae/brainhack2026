@@ -129,7 +129,7 @@ export const SPOT_THE_SPIN_QUESTIONS: QuizQuestion[] = [
     likes: '',
     shares: '',
     comments: '',
-    video_url: '',
+    video_url: 'https://wmprswjrjodqgqujcqzk.supabase.co/storage/v1/object/public/videos/module1-video2-fake-grant-temp.mp4',
     video_title: 'VIRAL: "Ministry of Finance" Announces $1,500 Recovery Package for All Singaporeans',
     video_description:
       'A smartly-dressed person sits at a professional-looking desk with a Singapore flag visible in the background. Speaking in an authoritative tone, they introduce themselves as representing the Ministry of Finance and announce a "$1,500 Singapore Recovery Assistance Package" available to all eligible Singaporeans. The video shows an official-looking graphic and asks viewers to visit a link to claim their payment — but warns that slots are limited and the offer closes in 48 hours.',
