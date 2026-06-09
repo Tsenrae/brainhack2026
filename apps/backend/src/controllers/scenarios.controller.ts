@@ -25,7 +25,7 @@ export const scenariosController = {
     const userId = await extractUserId(req, res);
     if (!userId) return;
 
-    const { scenarioId } = req.params;
+    const scenarioId = String(req.params.scenarioId ?? '');
     if (!VALID_SCENARIO_IDS.includes(scenarioId)) {
       res.status(400).json({ error: 'Unknown scenario ID' });
       return;

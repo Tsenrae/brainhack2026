@@ -1,4 +1,4 @@
-export type ScanType = 'text' | 'url' | 'qr';
+export type ScanType = 'text' | 'url' | 'qr' | 'upload';
 export type ThreatLevel = 'safe' | 'low' | 'suspicious' | 'high' | 'critical';
 
 export interface SuspiciousElement {
@@ -27,6 +27,15 @@ export interface AnalysisBreakdown {
   match_rate_pct: number;
 }
 
+export interface UrlMetadata {
+  final_url: string;
+  redirect_count: number;
+  redirect_chain: string[];
+  domain_changed: boolean;
+  page_title: string;
+  status_code: number;
+}
+
 export interface ScanResult {
   scan_id: string;
   type: ScanType;
@@ -42,6 +51,9 @@ export interface ScanResult {
   xp_awarded: number;
   newly_earned_badges: string[];
   scanned_at: string;
+  url_metadata?: UrlMetadata;
+  image_url?: string;
+  decoded_qr_url?: string;
 }
 
 export interface ScanHistoryItem {
