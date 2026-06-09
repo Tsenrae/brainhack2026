@@ -121,7 +121,7 @@ export function UserProfile() {
         </div>
 
         <div className="px-6 pb-6">
-          <div className="flex items-end gap-4 -mt-10 mb-4">
+          <div className="flex items-end gap-4 -mt-10 mb-4 relative z-10">
             <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white font-bold text-2xl border-4 border-white shadow-lg flex-shrink-0`}>
               {initials}
             </div>
