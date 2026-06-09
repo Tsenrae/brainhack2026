@@ -44,7 +44,7 @@ const ANSWER_OPTIONS = [
 ];
 
 export function SpotTheSpinQuiz() {
-  const { session } = useAuth();
+  const { session, refreshProfile, refreshMissionStatus } = useAuth();
   const navigate = useNavigate();
 
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
@@ -99,6 +99,10 @@ export function SpotTheSpinQuiz() {
         }),
       });
       const { data } = await res.json();
+      await refreshProfile();
+      if (data?.session_complete) {
+        await refreshMissionStatus();
+      }
       navigate('/mission/digital-shield/spot-the-spin/feedback', { state: data });
     } catch (err) {
       console.error('Failed to submit answer', err);

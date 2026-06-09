@@ -5,6 +5,7 @@ import {
   Eye, QrCode, Heart, Search, Repeat, ShieldCheck, Sword, Lightbulb,
   type LucideIcon,
 } from 'lucide-react';
+import { Link } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 
 // Frontend icon mapping — slug → visual metadata
@@ -38,28 +39,92 @@ interface BadgeFromApi {
   earned_at: string | null;
 }
 
-const missionHistory = [
-  { id: 1, name: 'Digital Shield', type: 'Campaign', result: 'Completed', xp: 450, accuracy: 94, date: '14 May 2026', icon: Shield, color: 'text-red-600', bg: 'bg-red-50' },
-  { id: 2, name: 'Spot the Spin', type: 'Quiz', result: 'Perfect Score', xp: 220, accuracy: 100, date: '12 May 2026', icon: Search, color: 'text-amber-600', bg: 'bg-amber-50' },
-  { id: 3, name: 'QR Code Sweep', type: 'Scanner', result: 'Completed', xp: 180, accuracy: 90, date: '10 May 2026', icon: QrCode, color: 'text-blue-600', bg: 'bg-blue-50' },
-  { id: 4, name: 'Deepfake Drills', type: 'Training', result: 'Completed', xp: 300, accuracy: 88, date: '7 May 2026', icon: Eye, color: 'text-purple-600', bg: 'bg-purple-50' },
-  { id: 5, name: 'Anti-Scam Blitz', type: 'Campaign', result: 'Completed', xp: 250, accuracy: 92, date: '3 May 2026', icon: Sword, color: 'text-rose-600', bg: 'bg-rose-50' },
-];
+interface Squad {
+  id: string;
+  name: string;
+  emblem: string;
+  description: string | null;
+  captain_id: string | null;
+  captain_username: string | null;
+  member_count: number;
+  total_xp: number;
+  created_at: string;
+}
 
-const leaderboard = [
-  { rank: 1, name: 'SentinelAlex', xp: 4280, avatar: 'SA' },
-  { rank: 2, name: 'GuardianMei',  xp: 3750, avatar: 'GM' },
-  { rank: 3, name: 'ShieldRaj',    xp: 3120, avatar: 'SR' },
-  { rank: 7, name: 'You',          xp: 0,    avatar: '',   isUser: true },
-];
+interface SquadMember {
+  user_id: string;
+  username: string;
+  full_name: string;
+  avatar_color: string;
+  level: number;
+  level_title: string;
+  xp: number;
+  is_captain: boolean;
+}
+
+interface MySquadResponse {
+  squad: Squad;
+  members: SquadMember[];
+  my_rank: number | null;
+}
+
+interface LeaderboardEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  full_name: string;
+  avatar_color: string;
+  level: number;
+  level_title: string;
+  xp: number;
+  accuracy_rate: number;
+  streak_days: number;
+  is_me: boolean;
+}
+
+interface IndividualLeaderboardResponse {
+  entries: LeaderboardEntry[];
+  my_entry: LeaderboardEntry | null;
+}
+
+const MODULE_HISTORY_META = {
+  'spot-the-spin': {
+    name: 'Spot the Spin',
+    type: 'Quiz',
+    xp: 200,
+    icon: Search,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+  },
+  'chain-reaction': {
+    name: 'Chain Reaction',
+    type: 'Training',
+    xp: 150,
+    icon: Repeat,
+    color: 'text-teal-600',
+    bg: 'bg-teal-50',
+  },
+  'shield-squad': {
+    name: 'Shield Squad',
+    type: 'Squad',
+    xp: 150,
+    icon: Users,
+    color: 'text-indigo-600',
+    bg: 'bg-indigo-50',
+  },
+} as const;
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
 export function UserProfile() {
-  const { session, profile } = useAuth();
+  const { session, profile, missionStatus, missionLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<'badges' | 'history' | 'squad'>('badges');
   const [badges, setBadges] = useState<BadgeFromApi[]>([]);
   const [badgesLoading, setBadgesLoading] = useState(true);
+  const [mySquad, setMySquad] = useState<MySquadResponse | null | undefined>(undefined);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<LeaderboardEntry[]>([]);
+  const [myLeaderboardEntry, setMyLeaderboardEntry] = useState<LeaderboardEntry | null>(null);
+  const [squadLoading, setSquadLoading] = useState(false);
 
   useEffect(() => {
     if (!session) { setBadgesLoading(false); return; }
@@ -71,6 +136,48 @@ export function UserProfile() {
       .catch(console.error)
       .finally(() => setBadgesLoading(false));
   }, [session]);
+
+  useEffect(() => {
+    if (!session || activeTab !== 'squad') return;
+
+    let cancelled = false;
+    setSquadLoading(true);
+
+    Promise.all([
+      fetch(`${BACKEND_URL}/api/squads/me`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }).then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        return (body.data ?? null) as MySquadResponse | null;
+      }),
+      fetch(`${BACKEND_URL}/api/leaderboard/individual`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      }).then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        return (body.data ?? { entries: [], my_entry: null }) as IndividualLeaderboardResponse;
+      }),
+    ])
+      .then(([squadData, leaderboardData]) => {
+        if (cancelled) return;
+        setMySquad(squadData);
+        setLeaderboardEntries(leaderboardData.entries ?? []);
+        setMyLeaderboardEntry(leaderboardData.my_entry ?? null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error(error);
+        setMySquad(null);
+        setLeaderboardEntries([]);
+        setMyLeaderboardEntry(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSquadLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, session]);
 
   const earnedCount = badges.filter(b => b.earned).length;
 
@@ -94,12 +201,41 @@ export function UserProfile() {
     ? new Date(profile.created_at).toLocaleDateString('en-SG', { month: 'short', year: 'numeric' })
     : '—';
 
-  // Leaderboard row with real data
-  const lbWithUser = leaderboard.map(e =>
-    e.isUser
-      ? { ...e, xp: profile?.xp ?? 0, avatar: initials, name: profile?.full_name ?? 'You' }
-      : e,
-  );
+  const missionHistory = (missionStatus?.modules ?? [])
+    .filter((module) => module.status === 'completed')
+    .map((module) => {
+      const meta = MODULE_HISTORY_META[module.module_slug as keyof typeof MODULE_HISTORY_META];
+      const totalAnswers = module.correct_count + module.wrong_count;
+      const accuracy = totalAnswers > 0
+        ? Math.round((module.correct_count / totalAnswers) * 100)
+        : null;
+      const completedAt = module.completed_at ?? null;
+
+      return {
+        id: module.module_slug,
+        name: meta?.name ?? module.module_slug,
+        type: meta?.type ?? 'Mission',
+        result: accuracy === 100 ? 'Perfect Score' : 'Completed',
+        xp: meta?.xp ?? 0,
+        accuracy,
+        completedAt,
+        date: completedAt
+          ? new Date(completedAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })
+          : 'Recently completed',
+        icon: meta?.icon ?? Award,
+        color: meta?.color ?? 'text-gray-600',
+        bg: meta?.bg ?? 'bg-gray-50',
+      };
+    })
+    .sort((a, b) => {
+      const aTime = a.completedAt ? Date.parse(a.completedAt) : 0;
+      const bTime = b.completedAt ? Date.parse(b.completedAt) : 0;
+      return bTime - aTime;
+    });
+
+  const completedMissionCount = missionHistory.length;
+  const topLeaderboardEntries = leaderboardEntries.slice(0, 3);
+  const showMyLeaderboardEntry = myLeaderboardEntry && !topLeaderboardEntries.some((entry) => entry.user_id === myLeaderboardEntry.user_id);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -183,7 +319,7 @@ export function UserProfile() {
         {[
           { label: 'Accuracy Rate', value: profile ? `${Math.round(profile.accuracy_rate)}%` : '—', sub: 'Across all missions', icon: Target, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', trend: 'All time' },
           { label: 'Daily Streak', value: profile ? `${profile.streak_days} days` : '—', sub: 'Keep it going!', icon: Flame, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', trend: 'Current streak' },
-          { label: 'Missions Done', value: profile ? String(profile.missions_completed) : '—', sub: 'Total completed', icon: CheckCircle, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', trend: 'All time' },
+          { label: 'Missions Done', value: String(completedMissionCount), sub: 'Total completed', icon: CheckCircle, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', trend: 'All time' },
           { label: 'Leaderboard', value: profile?.leaderboard_rank ? `#${profile.leaderboard_rank}` : '—', sub: 'National ranking', icon: Trophy, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200', trend: 'Nationwide' },
         ].map((stat) => (
           <div key={stat.label} className={`bg-white rounded-2xl border ${stat.border} p-4 shadow-sm`}>
@@ -287,9 +423,17 @@ export function UserProfile() {
           {activeTab === 'history' && (
             <div className="space-y-3">
               <p className="text-gray-500 text-sm mb-4">
-                {profile?.missions_completed ?? 0} missions completed
+                {completedMissionCount} {completedMissionCount === 1 ? 'mission' : 'missions'} completed
               </p>
-              {missionHistory.map((mission) => (
+              {missionLoading ? (
+                <div className="rounded-xl border border-gray-100 p-6 text-sm text-gray-500">
+                  Loading mission history...
+                </div>
+              ) : missionHistory.length === 0 ? (
+                <div className="rounded-xl border border-gray-100 p-6 text-sm text-gray-500">
+                  No completed mission history yet.
+                </div>
+              ) : missionHistory.map((mission) => (
                 <div key={mission.id} className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all cursor-pointer group">
                   <div className={`w-11 h-11 ${mission.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
                     <mission.icon className={`w-5 h-5 ${mission.color}`} />
@@ -308,9 +452,11 @@ export function UserProfile() {
                       <span className="text-xs text-gray-400 flex items-center gap-1">
                         <Calendar className="w-3 h-3" /> {mission.date}
                       </span>
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
-                        <Target className="w-3 h-3" /> {mission.accuracy}% accuracy
-                      </span>
+                      {mission.accuracy !== null && (
+                        <span className="text-xs text-gray-400 flex items-center gap-1">
+                          <Target className="w-3 h-3" /> {mission.accuracy}% accuracy
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -328,58 +474,171 @@ export function UserProfile() {
           {/* SQUAD TAB */}
           {activeTab === 'squad' && (
             <div className="space-y-6">
-              <div className="rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 p-5 text-white relative overflow-hidden">
-                <div className="absolute right-4 top-4 opacity-10"><Shield className="w-24 h-24" /></div>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                    <Users className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-lg">Red Sentinels</p>
-                    <p className="text-white/70 text-sm">6 members · Founded Mar 2026</p>
-                  </div>
-                  <div className="ml-auto bg-white/20 rounded-xl px-3 py-1 text-sm font-bold">Rank #4</div>
+              {squadLoading ? (
+                <div className="rounded-2xl border border-gray-200 p-6 text-sm text-gray-500">
+                  Loading squad and leaderboard...
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {[{ label: 'Squad XP', value: '14,280' }, { label: 'Missions', value: '87' }, { label: 'Avg Accuracy', value: '91%' }].map(({ label, value }) => (
-                    <div key={label} className="bg-white/15 rounded-xl p-3 text-center">
-                      <div className="font-bold text-lg">{value}</div>
-                      <div className="text-white/70 text-xs">{label}</div>
+              ) : mySquad ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 p-5 text-white relative overflow-hidden">
+                    <div className="absolute right-4 top-4 opacity-10"><Shield className="w-24 h-24" /></div>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl">
+                        {mySquad.squad.emblem}
+                      </div>
+                      <div>
+                        <p className="font-bold text-lg">{mySquad.squad.name}</p>
+                        <p className="text-white/70 text-sm">
+                          {mySquad.squad.member_count} members · Founded{' '}
+                          {new Date(mySquad.squad.created_at).toLocaleDateString('en-SG', { month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="ml-auto bg-white/20 rounded-xl px-3 py-1 text-sm font-bold">
+                        {mySquad.my_rank ? `Rank #${mySquad.my_rank}` : 'Unranked'}
+                      </div>
                     </div>
-                  ))}
+                    {mySquad.squad.description && (
+                      <p className="text-sm text-white/85 mb-4">{mySquad.squad.description}</p>
+                    )}
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Squad XP', value: mySquad.squad.total_xp.toLocaleString() },
+                        { label: 'Members', value: String(mySquad.squad.member_count) },
+                        { label: 'Captain', value: mySquad.squad.captain_username ?? '—' },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="bg-white/15 rounded-xl p-3 text-center">
+                          <div className="font-bold text-lg">{value}</div>
+                          <div className="text-white/70 text-xs">{label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-gray-700 font-semibold text-sm mb-3">Squad Members</h3>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {mySquad.members.map((member) => {
+                        const memberGradient = AVATAR_GRADIENTS[member.avatar_color] ?? AVATAR_GRADIENTS.red;
+                        const memberInitials = member.full_name
+                          .split(' ')
+                          .map((name) => name[0])
+                          .join('')
+                          .toUpperCase()
+                          .slice(0, 2);
+
+                        return (
+                          <div key={member.user_id} className="rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${memberGradient} flex items-center justify-center text-white font-bold text-sm`}>
+                              {memberInitials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-gray-900 truncate">{member.full_name}</span>
+                                {member.is_captain && (
+                                  <span className="text-[10px] bg-yellow-100 text-yellow-700 rounded-full px-2 py-0.5 font-medium">
+                                    Captain
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                @{member.username} · Lv {member.level} {member.level_title}
+                              </div>
+                            </div>
+                            <div className="text-xs font-bold text-orange-600">
+                              {member.xp.toLocaleString()} XP
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-gray-300 p-6 bg-gray-50">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-gray-200 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">You&apos;re not in a squad yet</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Join or create a squad to see your team stats here and compete on the squad leaderboard.
+                      </p>
+                    </div>
+                    <Link
+                      to="/squads"
+                      className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors"
+                    >
+                      Manage Squads
+                    </Link>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <h3 className="text-gray-700 font-semibold text-sm mb-3">National Leaderboard — Your Position</h3>
                 <div className="rounded-xl border border-gray-200 overflow-hidden">
-                  {lbWithUser.map((entry, idx) => (
-                    <div key={entry.rank}>
-                      {idx === 3 && (
-                        <div className="py-2 px-4 flex items-center gap-2 text-gray-400 text-xs">
-                          <div className="flex-1 border-t border-dashed border-gray-200" />
-                          <span>···</span>
-                          <div className="flex-1 border-t border-dashed border-gray-200" />
+                  {topLeaderboardEntries.map((entry) => {
+                    const isUser = entry.is_me;
+                    const entryGradient = AVATAR_GRADIENTS[entry.avatar_color] ?? AVATAR_GRADIENTS.red;
+                    const entryInitials = entry.full_name
+                      .split(' ')
+                      .map((name) => name[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2);
+
+                    return (
+                      <div key={entry.user_id}>
+                        <div className={`flex items-center gap-3 px-4 py-3 ${isUser ? 'bg-red-50 border-l-4 border-red-500' : entry.rank <= 3 ? 'bg-yellow-50/50' : 'bg-white'}`}>
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${entry.rank === 1 ? 'bg-yellow-100 text-yellow-700' : entry.rank === 2 ? 'bg-gray-100 text-gray-600' : entry.rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'}`}>
+                            {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                          </div>
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 bg-gradient-to-br ${entryGradient}`}>
+                            {entryInitials}
+                          </div>
+                          <div className="flex-1">
+                            <span className={`text-sm font-medium ${isUser ? 'text-red-700' : 'text-gray-900'}`}>{entry.full_name}</span>
+                            {isUser && <span className="ml-2 text-xs bg-red-100 text-red-600 rounded-full px-2 py-0.5 font-medium">You</span>}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm">
+                            <Zap className="w-4 h-4 text-orange-400" />
+                            <span className={`font-bold ${isUser ? 'text-red-600' : 'text-gray-700'}`}>{entry.xp.toLocaleString()} XP</span>
+                          </div>
                         </div>
-                      )}
-                      <div className={`flex items-center gap-3 px-4 py-3 ${entry.isUser ? 'bg-red-50 border-l-4 border-red-500' : idx < 3 ? 'bg-yellow-50/50' : 'bg-white'}`}>
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${entry.rank === 1 ? 'bg-yellow-100 text-yellow-700' : entry.rank === 2 ? 'bg-gray-100 text-gray-600' : entry.rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'}`}>
-                          {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                      </div>
+                    );
+                  })}
+                  {showMyLeaderboardEntry && myLeaderboardEntry && (
+                    <div key={myLeaderboardEntry.user_id}>
+                      <div className="py-2 px-4 flex items-center gap-2 text-gray-400 text-xs">
+                        <div className="flex-1 border-t border-dashed border-gray-200" />
+                        <span>···</span>
+                        <div className="flex-1 border-t border-dashed border-gray-200" />
+                      </div>
+                      <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border-l-4 border-red-500">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 bg-gray-50 text-gray-500">
+                          #{myLeaderboardEntry.rank}
                         </div>
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 ${entry.isUser ? `bg-gradient-to-br ${avatarGradient}` : 'bg-gradient-to-br from-gray-400 to-gray-500'}`}>
-                          {entry.avatar}
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 bg-gradient-to-br ${avatarGradient}`}>
+                          {initials}
                         </div>
                         <div className="flex-1">
-                          <span className={`text-sm font-medium ${entry.isUser ? 'text-red-700' : 'text-gray-900'}`}>{entry.name}</span>
-                          {entry.isUser && <span className="ml-2 text-xs bg-red-100 text-red-600 rounded-full px-2 py-0.5 font-medium">You</span>}
+                          <span className="text-sm font-medium text-red-700">{myLeaderboardEntry.full_name}</span>
+                          <span className="ml-2 text-xs bg-red-100 text-red-600 rounded-full px-2 py-0.5 font-medium">You</span>
                         </div>
                         <div className="flex items-center gap-1 text-sm">
                           <Zap className="w-4 h-4 text-orange-400" />
-                          <span className={`font-bold ${entry.isUser ? 'text-red-600' : 'text-gray-700'}`}>{entry.xp.toLocaleString()} XP</span>
+                          <span className="font-bold text-red-600">{myLeaderboardEntry.xp.toLocaleString()} XP</span>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )}
+                  {!squadLoading && topLeaderboardEntries.length === 0 && (
+                    <div className="px-4 py-6 text-sm text-gray-500">
+                      No leaderboard data available yet.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
