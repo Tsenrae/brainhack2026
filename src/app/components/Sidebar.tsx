@@ -1,4 +1,4 @@
-import { Home, BookOpen, Scan, HeadphonesIcon, Users, User, Shield, Zap, Bell, ArrowLeft, Trophy, BarChart2, Film } from 'lucide-react';
+import { Home, BookOpen, Scan, HeadphonesIcon, Users, User, Shield, Zap, Bell, ArrowLeft, Trophy, BarChart2, Film, MessageCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +19,7 @@ export function Sidebar() {
     { icon: BookOpen, label: 'Learn', path: '/learn' },
     { icon: Scan, label: 'Scan', path: '/scanner' },
     { icon: HeadphonesIcon, label: 'Support', path: '/support/cyberbullying' },
+    { icon: MessageCircle, label: 'Telegram Bot', path: '/integrations/telegram' },
     { icon: Users, label: 'Community', path: '/community/submit' },
     { icon: Trophy, label: 'Leaderboard', path: '/leaderboard' },
     { icon: Users, label: 'Squads', path: '/squads' },

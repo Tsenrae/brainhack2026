@@ -25,6 +25,10 @@ export interface UserProfile {
   accuracy_rate: number;
   leaderboard_rank: number | null;
   squad_id: string | null;
+  telegram_user_id: string | null;
+  telegram_username: string | null;
+  telegram_link_code: string | null;
+  telegram_linked_at: string | null;
   subscribe_updates: boolean;
   created_at: string;
   updated_at: string;

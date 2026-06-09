@@ -1,18 +1,30 @@
-import { supabaseAdmin, isMockMode } from '../config/supabase.js';
-import { groqClient, isGroqEnabled, GROQ_MODEL, GROQ_VISION_MODEL } from '../config/groq.js';
-import { usersService } from './users.service.js';
-import { badgesService } from './badges.service.js';
-import { scrapeUrl } from '../utils/urlScraper.js';
-import { decodeQrFromBase64 } from '../utils/qrDecoder.js';
+import { supabaseAdmin, isMockMode } from "../config/supabase.js";
+import {
+  groqClient,
+  isGroqEnabled,
+  GROQ_MODEL,
+  GROQ_VISION_MODEL,
+} from "../config/groq.js";
+import { usersService } from "./users.service.js";
+import { badgesService } from "./badges.service.js";
+import { scrapeUrl } from "../utils/urlScraper.js";
+import { decodeQrFromBase64 } from "../utils/qrDecoder.js";
 import type {
-  ScanType, ThreatLevel, ScanResult, ScanHistoryItem, ScannerStats,
-  SuspiciousElement, ScanRedFlag, RecommendedAction, AnalysisBreakdown,
+  ScanType,
+  ThreatLevel,
+  ScanResult,
+  ScanHistoryItem,
+  ScannerStats,
+  SuspiciousElement,
+  ScanRedFlag,
+  RecommendedAction,
+  AnalysisBreakdown,
   UrlMetadata,
-} from '../types/scanner.types.js';
+} from "../types/scanner.types.js";
 
 const XP_PER_SCAN = 30;
 const XP_THREAT_BONUS = 20;
-const SCANNER_BUCKET = 'scanner-uploads';
+const SCANNER_BUCKET = "scanner-uploads";
 
 // ── System prompt ──────────────────────────────────────────────────────────────
 
@@ -103,170 +115,385 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-function coerceSeverity(s: unknown): SuspiciousElement['severity'] {
-  return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].includes(s as string)
-    ? (s as SuspiciousElement['severity'])
-    : 'MEDIUM';
+function coerceSeverity(s: unknown): SuspiciousElement["severity"] {
+  return ["CRITICAL", "HIGH", "MEDIUM", "LOW"].includes(s as string)
+    ? (s as SuspiciousElement["severity"])
+    : "MEDIUM";
 }
 
-function coercePriority(p: unknown): RecommendedAction['priority'] {
-  return ['CRITICAL', 'HIGH', 'MEDIUM', 'RECOMMENDED'].includes(p as string)
-    ? (p as RecommendedAction['priority'])
-    : 'MEDIUM';
+function coercePriority(p: unknown): RecommendedAction["priority"] {
+  return ["CRITICAL", "HIGH", "MEDIUM", "RECOMMENDED"].includes(p as string)
+    ? (p as RecommendedAction["priority"])
+    : "MEDIUM";
 }
 
 function validateLLMResponse(raw: unknown): LLMAnalysis {
   const r = raw as Record<string, unknown>;
   const riskScore = clamp(Number(r.risk_score ?? 0), 0, 100);
-  const validLevels = ['safe', 'low', 'suspicious', 'high', 'critical'];
+
+  const validLevels = ["safe", "low", "suspicious", "high", "critical"];
   const threatLevel = validLevels.includes(r.threat_level as string)
     ? (r.threat_level as string)
-    : riskScore <= 20 ? 'safe' : riskScore <= 40 ? 'low' : riskScore <= 60 ? 'suspicious' : riskScore <= 80 ? 'high' : 'critical';
+    : riskScore <= 20
+      ? "safe"
+      : riskScore <= 40
+        ? "low"
+        : riskScore <= 60
+          ? "suspicious"
+          : riskScore <= 80
+            ? "high"
+            : "critical";
 
   const elements: SuspiciousElement[] = Array.isArray(r.suspicious_elements)
-    ? (r.suspicious_elements as Record<string, unknown>[]).slice(0, 5).map(e => ({
-        element: String(e.element ?? 'Suspicious element'), location: String(e.location ?? 'Content'),
-        severity: coerceSeverity(e.severity), description: String(e.description ?? ''),
-      }))
+    ? (r.suspicious_elements as Record<string, unknown>[])
+        .slice(0, 5)
+        .map((e) => ({
+          element: String(e.element ?? "Suspicious element"),
+          location: String(e.location ?? "Content"),
+          severity: coerceSeverity(e.severity),
+          description: String(e.description ?? ""),
+        }))
     : [];
 
   const flags: ScanRedFlag[] = Array.isArray(r.red_flags)
-    ? (r.red_flags as Record<string, unknown>[]).slice(0, 5).map(f => ({
-        title: String(f.title ?? 'Red flag'), description: String(f.description ?? ''),
-        examples: Array.isArray(f.examples) ? (f.examples as unknown[]).map(String) : [],
+    ? (r.red_flags as Record<string, unknown>[]).slice(0, 5).map((f) => ({
+        title: String(f.title ?? "Red flag"),
+        description: String(f.description ?? ""),
+        examples: Array.isArray(f.examples)
+          ? (f.examples as unknown[]).map(String)
+          : [],
         severity: coerceSeverity(f.severity),
       }))
     : [];
 
   const actions: RecommendedAction[] = Array.isArray(r.recommended_actions)
-    ? (r.recommended_actions as Record<string, unknown>[]).slice(0, 6).map(a => ({
-        action: String(a.action ?? 'Stay vigilant'), description: String(a.description ?? ''),
-        priority: coercePriority(a.priority),
-      }))
-    : [{ action: 'Stay vigilant', description: 'Exercise caution with this content.', priority: 'RECOMMENDED' }];
+    ? (r.recommended_actions as Record<string, unknown>[])
+        .slice(0, 6)
+        .map((a) => ({
+          action: String(a.action ?? "Stay vigilant"),
+          description: String(a.description ?? ""),
+          priority: coercePriority(a.priority),
+        }))
+    : [
+        {
+          action: "Stay vigilant",
+          description: "Exercise caution with this content.",
+          priority: "RECOMMENDED",
+        },
+      ];
 
   const bd = (r.analysis_breakdown ?? {}) as Record<string, unknown>;
   return {
-    risk_score: riskScore, threat_level: threatLevel as ThreatLevel,
-    classification: String(r.classification ?? (riskScore <= 20 ? 'Safe' : 'Suspicious')),
+    risk_score: riskScore,
+    threat_level: threatLevel as ThreatLevel,
+    classification: String(
+      r.classification ?? (riskScore <= 20 ? "Safe" : "Suspicious"),
+    ),
     confidence_score: clamp(Number(r.confidence_score ?? 75), 50, 99),
-    suspicious_elements: elements, red_flags: flags, recommended_actions: actions,
+    suspicious_elements: elements,
+    red_flags: flags,
+    recommended_actions: actions,
     analysis_breakdown: {
-      pattern_matches:     clamp(Number(bd.pattern_matches     ?? elements.length), 0, 50),
+      pattern_matches: clamp(
+        Number(bd.pattern_matches ?? elements.length),
+        0,
+        50,
+      ),
       manipulation_tactics: clamp(Number(bd.manipulation_tactics ?? 0), 0, 20),
-      match_rate_pct:      clamp(Number(bd.match_rate_pct      ?? riskScore + 5), 0, 99),
+      match_rate_pct: clamp(Number(bd.match_rate_pct ?? riskScore + 5), 0, 99),
     },
   };
 }
 
 // ── Text / URL / QR analysis via Groq text ────────────────────────────────────
 
-async function analyzeWithGroq(type: ScanType, content: string): Promise<LLMAnalysis> {
+async function analyzeWithGroq(
+  type: ScanType,
+  content: string,
+): Promise<LLMAnalysis> {
   const typeLabels: Record<ScanType, string> = {
-    text:   'text message or written content',
-    url:    'URL scan with scraped page data',
-    qr:     'URL extracted from a QR code, with scraped page data',
-    upload: 'uploaded file / screenshot',
+    text: "text message or written content",
+    url: "URL or web link",
+    qr: "URL extracted from a QR code",
+    upload: "uploaded image or screenshot",
   };
-  console.log(`[groq] calling ${GROQ_MODEL} for ${type} scan (${content.length} chars)`);
+
+  console.log(
+    `[groq] calling ${GROQ_MODEL} for ${type} scan (${content.length} chars)`,
+  );
+
   const completion = await groqClient!.chat.completions.create({
     model: GROQ_MODEL,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user',   content: `Analyse this ${typeLabels[type]}:\n\n${content}` },
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Analyse this ${typeLabels[type]}:\n\n${content}`,
+      },
     ],
-    response_format: { type: 'json_object' },
+    response_format: { type: "json_object" },
     temperature: 0.1,
     max_tokens: 2048,
   });
   const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error('Groq returned empty response');
-  console.log(`[groq] tokens: ${completion.usage?.prompt_tokens ?? '?'}in / ${completion.usage?.completion_tokens ?? '?'}out`);
+  const usage = completion.usage;
+  console.log(
+    `[groq] response received — risk_score will parse from JSON | tokens: ${usage?.prompt_tokens ?? "?"} in / ${usage?.completion_tokens ?? "?"} out`,
+  );
+  if (!raw) throw new Error("Groq returned empty response");
+
   return validateLLMResponse(JSON.parse(raw));
 }
 
 // ── Vision analysis via Groq multimodal ──────────────────────────────────────
 
-async function analyzeWithVision(base64: string, mime: string): Promise<LLMAnalysis> {
+async function analyzeWithVision(
+  base64: string,
+  mime: string,
+): Promise<LLMAnalysis> {
   console.log(`[groq-vision] calling ${GROQ_VISION_MODEL} for image scan`);
   const completion = await groqClient!.chat.completions.create({
     model: GROQ_VISION_MODEL,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    messages: [{ role: 'user', content: [
-      { type: 'text', text: `${SYSTEM_PROMPT}\n\nAnalyse this screenshot/image for scams, phishing, or digital threats targeting Singapore users. Read all visible text carefully.` },
-      { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
-    ] as any }],
-    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `${SYSTEM_PROMPT}\n\nAnalyse this screenshot/image for scams, phishing, or digital threats targeting Singapore users. Read all visible text carefully.`,
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:${mime};base64,${base64}` },
+          },
+        ] as any,
+      },
+    ],
+    response_format: { type: "json_object" },
     temperature: 0.1,
     max_tokens: 2048,
   });
   const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error('Groq vision returned empty response');
+  if (!raw) throw new Error("Groq vision returned empty response");
   return validateLLMResponse(JSON.parse(raw));
 }
 
 // ── Build enriched URL prompt ─────────────────────────────────────────────────
 
-function buildUrlPrompt(url: string, meta: UrlMetadata, pageText: string, pageTitle: string, metaDesc: string): string {
+function buildUrlPrompt(
+  url: string,
+  meta: UrlMetadata,
+  pageText: string,
+  pageTitle: string,
+  metaDesc: string,
+): string {
   const lines = [
     `=== URL SCAN REPORT ===`,
     `Original URL: ${url}`,
     `Final URL after redirects: ${meta.final_url}`,
-    `Redirect count: ${meta.redirect_count}${meta.redirect_count > 3 ? ' (HIGH — suspicious)' : ''}`,
-    `Domain changed: ${meta.domain_changed ? 'YES (original ≠ final — highly suspicious)' : 'No'}`,
-    `Redirect chain: ${meta.redirect_chain.join(' → ')}`,
+    `Redirect count: ${meta.redirect_count}${meta.redirect_count > 3 ? " (HIGH — suspicious)" : ""}`,
+    `Domain changed: ${meta.domain_changed ? "YES (original ≠ final — highly suspicious)" : "No"}`,
+    `Redirect chain: ${meta.redirect_chain.join(" → ")}`,
     `HTTP status: ${meta.status_code}`,
-    `Page title: ${pageTitle || '(none)'}`,
-    `Meta description: ${metaDesc || '(none)'}`,
+    `Page title: ${pageTitle || "(none)"}`,
+    `Meta description: ${metaDesc || "(none)"}`,
     ``,
     `=== VISIBLE PAGE TEXT (first 3500 chars) ===`,
-    pageText || '(could not extract page text)',
+    pageText || "(could not extract page text)",
   ];
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 // ── Regex fallback ─────────────────────────────────────────────────────────────
 
-interface Pattern { pattern: RegExp; weight: number; label: string; location: string; }
+interface Pattern {
+  pattern: RegExp;
+  weight: number;
+  label: string;
+  location: string;
+}
+
 const URGENCY: Pattern[] = [
-  { pattern: /\b(urgent|urgently)\b/i,                                    weight: 15, label: 'Urgent language',          location: 'Message body' },
-  { pattern: /\bact now\b/i,                                              weight: 20, label: 'Act now pressure',          location: 'Message body' },
-  { pattern: /\blimited time\b/i,                                         weight: 15, label: 'Limited time pressure',     location: 'Message body' },
-  { pattern: /\bimmediately\b/i,                                          weight: 10, label: 'Immediacy pressure',        location: 'Message body' },
-  { pattern: /\bwithin \d+ hours?\b/i,                                    weight: 15, label: 'Deadline pressure',         location: 'Message body' },
-  { pattern: /\baccount.{0,20}(closed|suspended|blocked|terminated)\b/i,  weight: 25, label: 'Account suspension threat', location: 'Message body' },
-  { pattern: /\bwill be (permanently|automatically) (closed|blocked|deleted)\b/i, weight: 30, label: 'Permanent consequence', location: 'Message body' },
+  {
+    pattern: /\b(urgent|urgently)\b/i,
+    weight: 15,
+    label: "Urgent language",
+    location: "Message body",
+  },
+  {
+    pattern: /\bact now\b/i,
+    weight: 20,
+    label: "Act now pressure",
+    location: "Message body",
+  },
+  {
+    pattern: /\blimited time\b/i,
+    weight: 15,
+    label: "Limited time pressure",
+    location: "Message body",
+  },
+  {
+    pattern: /\bimmediately\b/i,
+    weight: 10,
+    label: "Immediacy pressure",
+    location: "Message body",
+  },
+  {
+    pattern: /\bwithin \d+ hours?\b/i,
+    weight: 15,
+    label: "Deadline pressure",
+    location: "Message body",
+  },
+  {
+    pattern: /\baccount.{0,20}(closed|suspended|blocked|terminated)\b/i,
+    weight: 25,
+    label: "Account suspension threat",
+    location: "Message body",
+  },
+  {
+    pattern:
+      /\bwill be (permanently|automatically) (closed|blocked|deleted)\b/i,
+    weight: 30,
+    label: "Permanent consequence",
+    location: "Message body",
+  },
 ];
 const CREDENTIALS: Pattern[] = [
-  { pattern: /\b(password|passcode)\b/i,              weight: 35, label: 'Password request',         location: 'Form fields' },
-  { pattern: /\b(OTP|one.time.pass)\b/i,              weight: 40, label: 'OTP request',              location: 'Form fields' },
-  { pattern: /\b(PIN|personal identification)\b/i,    weight: 30, label: 'PIN request',              location: 'Form fields' },
-  { pattern: /\bbank.{0,20}(account|number|detail)\b/i, weight: 35, label: 'Bank account details',  location: 'Form fields' },
-  { pattern: /\bcredit card\b/i,                      weight: 30, label: 'Credit card request',      location: 'Form fields' },
-  { pattern: /\binternet banking\b/i,                 weight: 25, label: 'Internet banking request', location: 'Form fields' },
+  {
+    pattern: /\b(password|passcode)\b/i,
+    weight: 35,
+    label: "Password request",
+    location: "Form fields",
+  },
+  {
+    pattern: /\b(OTP|one.time.pass)\b/i,
+    weight: 40,
+    label: "OTP request",
+    location: "Form fields",
+  },
+  {
+    pattern: /\b(PIN|personal identification)\b/i,
+    weight: 30,
+    label: "PIN request",
+    location: "Form fields",
+  },
+  {
+    pattern: /\bbank.{0,20}(account|number|detail)\b/i,
+    weight: 35,
+    label: "Bank account details",
+    location: "Form fields",
+  },
+  {
+    pattern: /\bcredit card\b/i,
+    weight: 30,
+    label: "Credit card request",
+    location: "Form fields",
+  },
+  {
+    pattern: /\binternet banking\b/i,
+    weight: 25,
+    label: "Internet banking request",
+    location: "Form fields",
+  },
 ];
 const REWARDS: Pattern[] = [
-  { pattern: /\byou.{0,10}(have won|won)\b/i,                      weight: 25, label: 'Prize claim',         location: 'Message body' },
-  { pattern: /\bfree (iphone|samsung|laptop|gift|voucher|prize)\b/i, weight: 30, label: 'Free prize offer', location: 'Message body' },
-  { pattern: /\bgiveaway\b/i,                                       weight: 20, label: 'Giveaway claim',      location: 'Message body' },
-  { pattern: /\bguaranteed (return|profit|income)\b/i,              weight: 30, label: 'Guaranteed returns',  location: 'Message body' },
+  {
+    pattern: /\byou.{0,10}(have won|won)\b/i,
+    weight: 25,
+    label: "Prize claim",
+    location: "Message body",
+  },
+  {
+    pattern: /\bfree (iphone|samsung|laptop|gift|voucher|prize)\b/i,
+    weight: 30,
+    label: "Free prize offer",
+    location: "Message body",
+  },
+  {
+    pattern: /\bgiveaway\b/i,
+    weight: 20,
+    label: "Giveaway claim",
+    location: "Message body",
+  },
+  {
+    pattern: /\bguaranteed (return|profit|income)\b/i,
+    weight: 30,
+    label: "Guaranteed returns",
+    location: "Message body",
+  },
 ];
 const URLS: Pattern[] = [
-  { pattern: /https?:\/\/\d+\.\d+\.\d+\.\d+/i,                    weight: 50, label: 'IP address URL',       location: 'Link / URL' },
-  { pattern: /\b(g0v|gov-sg|govsg|sgbank)\b/i,                     weight: 45, label: 'Domain impersonation', location: 'Link / URL' },
-  { pattern: /\.(xyz|tk|ml|ga|cf|pw|top)\b/i,                      weight: 40, label: 'Suspicious TLD',       location: 'Link / URL' },
-  { pattern: /\bbit\.ly\b|\btinyurl\b/i,                            weight: 20, label: 'Shortened URL',        location: 'Link / URL' },
-  { pattern: /\b(gov\.sg|mom\.gov\.sg|iras\.gov\.sg)\b/i,           weight: -30, label: 'Official SG domain', location: 'Link / URL' },
+  {
+    pattern: /https?:\/\/\d+\.\d+\.\d+\.\d+/i,
+    weight: 50,
+    label: "IP address URL",
+    location: "Link / URL",
+  },
+  {
+    pattern: /\b(g0v|gov-sg|govsg|sgbank)\b/i,
+    weight: 45,
+    label: "Domain impersonation",
+    location: "Link / URL",
+  },
+  {
+    pattern: /\.(xyz|tk|ml|ga|cf|pw|top)\b/i,
+    weight: 40,
+    label: "Suspicious TLD",
+    location: "Link / URL",
+  },
+  {
+    pattern: /\bbit\.ly\b|\btinyurl\b/i,
+    weight: 20,
+    label: "Shortened URL",
+    location: "Link / URL",
+  },
+  {
+    pattern: /\b(gov\.sg|mom\.gov\.sg|iras\.gov\.sg)\b/i,
+    weight: -30,
+    label: "Official SG domain",
+    location: "Link / URL",
+  },
 ];
 const AUTHORITY: Pattern[] = [
-  { pattern: /\b(singapore police force|SPF)\b/i, weight: 20, label: 'Police impersonation',    location: 'Sender / header' },
-  { pattern: /\b(IRAS|inland revenue)\b/i,         weight: 15, label: 'IRAS impersonation',      location: 'Sender / header' },
-  { pattern: /\b(CPF board|CPF)\b/i,               weight: 15, label: 'CPF impersonation',       location: 'Sender / header' },
-  { pattern: /\b(DBS|OCBC|UOB).{0,20}verify\b/i,  weight: 25, label: 'Bank impersonation',      location: 'Sender / header' },
+  {
+    pattern: /\b(singapore police force|SPF)\b/i,
+    weight: 20,
+    label: "Police impersonation",
+    location: "Sender / header",
+  },
+  {
+    pattern: /\b(IRAS|inland revenue)\b/i,
+    weight: 15,
+    label: "IRAS impersonation",
+    location: "Sender / header",
+  },
+  {
+    pattern: /\b(CPF board|CPF)\b/i,
+    weight: 15,
+    label: "CPF impersonation",
+    location: "Sender / header",
+  },
+  {
+    pattern: /\b(DBS|OCBC|UOB).{0,20}verify\b/i,
+    weight: 25,
+    label: "Bank impersonation",
+    location: "Sender / header",
+  },
 ];
-const ALL_PATTERNS = [...URGENCY, ...CREDENTIALS, ...REWARDS, ...URLS, ...AUTHORITY];
+const ALL_PATTERNS = [
+  ...URGENCY,
+  ...CREDENTIALS,
+  ...REWARDS,
+  ...URLS,
+  ...AUTHORITY,
+];
 
-interface Match { label: string; weight: number; location: string; }
+interface Match {
+  label: string;
+  weight: number;
+  location: string;
+}
 
 function analyzeWithRegex(content: string): LLMAnalysis {
   const matches: Match[] = [];
@@ -275,58 +502,138 @@ function analyzeWithRegex(content: string): LLMAnalysis {
   }
   const raw = matches.reduce((s, m) => s + m.weight, 0);
   const riskScore = Math.min(100, Math.max(0, raw));
-  const positiveMatches = matches.filter(m => m.weight > 0);
-  const levelMap = (s: number) => s <= 20 ? 'safe' : s <= 40 ? 'low' : s <= 60 ? 'suspicious' : s <= 80 ? 'high' : 'critical';
-  const clsMap = (s: number) => s <= 20 ? 'Safe' : s <= 40 ? 'Low Risk' :
-    matches.some(m => CREDENTIALS.some(p => p.label === m.label)) ? 'Phishing' :
-    matches.some(m => REWARDS.some(p => p.label === m.label)) ? 'Scam' : 'Suspicious';
-  const elements: SuspiciousElement[] = positiveMatches.sort((a, b) => b.weight - a.weight).slice(0, 5).map(m => ({
-    element: m.label, location: m.location,
-    severity: (m.weight >= 35 ? 'CRITICAL' : m.weight >= 25 ? 'HIGH' : m.weight >= 15 ? 'MEDIUM' : 'LOW') as SuspiciousElement['severity'],
-    description: m.label,
-  }));
-  const hasGroup = (group: Pattern[]) => matches.some(m => group.some(p => p.label === m.label));
+  const positiveMatches = matches.filter((m) => m.weight > 0);
+
+  const levelMap = (s: number) =>
+    s <= 20
+      ? "safe"
+      : s <= 40
+        ? "low"
+        : s <= 60
+          ? "suspicious"
+          : s <= 80
+            ? "high"
+            : "critical";
+  const clsMap = (s: number) =>
+    s <= 20
+      ? "Safe"
+      : s <= 40
+        ? "Low Risk"
+        : matches.some((m) => CREDENTIALS.some((p) => p.label === m.label))
+          ? "Phishing"
+          : matches.some((m) => REWARDS.some((p) => p.label === m.label))
+            ? "Scam"
+            : "Suspicious";
+
+  const elements: SuspiciousElement[] = positiveMatches
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5)
+    .map((m) => ({
+      element: m.label,
+      location: m.location,
+      severity: (m.weight >= 35
+        ? "CRITICAL"
+        : m.weight >= 25
+          ? "HIGH"
+          : m.weight >= 15
+            ? "MEDIUM"
+            : "LOW") as SuspiciousElement["severity"],
+      description: m.label,
+    }));
+
+  const hasGroup = (group: Pattern[]) =>
+    matches.some((m) => group.some((p) => p.label === m.label));
   const flags: ScanRedFlag[] = [];
-  if (hasGroup(URGENCY))    flags.push({ title: 'Urgency Pressure',   description: 'Creates false urgency.', examples: ['"Act now"', '"Limited time"'], severity: 'CRITICAL' });
-  if (hasGroup(CREDENTIALS)) flags.push({ title: 'Requests Sensitive Information', description: 'Legitimate orgs never ask for passwords via message.', examples: ['Password', 'OTP', 'PIN'], severity: 'CRITICAL' });
-  if (hasGroup(REWARDS))    flags.push({ title: 'Too Good to Be True', description: 'Unrealistic rewards used to lure victims.', examples: ['"Free prize"', '"Guaranteed returns"'], severity: 'HIGH' });
-  if (hasGroup(URLS.filter(p => p.weight > 0))) flags.push({ title: 'Suspicious Link', description: 'URL shows signs of domain impersonation.', examples: ['Suspicious TLD', 'IP address URL'], severity: 'CRITICAL' });
-  if (hasGroup(AUTHORITY))  flags.push({ title: 'Authority Impersonation', description: 'Pretends to be a government agency or bank.', examples: ['Government agency', 'Bank name'], severity: 'CRITICAL' });
+  if (hasGroup(URGENCY))
+    flags.push({
+      title: "Urgency Pressure",
+      description: "Creates false urgency to bypass careful thinking.",
+      examples: ['"Act now"', '"Limited time"'],
+      severity: "CRITICAL",
+    });
+  if (hasGroup(CREDENTIALS))
+    flags.push({
+      title: "Requests Sensitive Information",
+      description:
+        "Legitimate organisations never ask for passwords or OTPs via message.",
+      examples: ["Password", "OTP", "PIN"],
+      severity: "CRITICAL",
+    });
+  if (hasGroup(REWARDS))
+    flags.push({
+      title: "Too Good to Be True",
+      description: "Unrealistic rewards used to lure victims.",
+      examples: ['"Free prize"', '"Guaranteed returns"'],
+      severity: "HIGH",
+    });
+  if (hasGroup(URLS.filter((p) => p.weight > 0)))
+    flags.push({
+      title: "Suspicious Link",
+      description:
+        "URL shows signs of domain impersonation or suspicious hosting.",
+      examples: ["Suspicious TLD", "IP address URL"],
+      severity: "CRITICAL",
+    });
+  if (hasGroup(AUTHORITY))
+    flags.push({
+      title: "Authority Impersonation",
+      description: "Pretends to be a government agency or bank.",
+      examples: ["Government agency name", "Bank name"],
+      severity: "CRITICAL",
+    });
+
   const actions: RecommendedAction[] = [];
-  if (riskScore > 40) actions.push({ action: 'Do Not Click Any Links', description: 'Links may lead to fraudulent websites.', priority: 'CRITICAL' });
-  if (riskScore > 60) actions.push({ action: 'Do Not Share Personal Information', description: 'Never provide passwords, PINs, or OTPs through messages.', priority: 'CRITICAL' });
-  actions.push({ action: 'Verify the Source', description: 'Contact the organisation via official channels.', priority: riskScore > 50 ? 'HIGH' : 'MEDIUM' });
-  if (riskScore > 50) actions.push({ action: 'Report to ScamShield', description: 'Forward to ScamShield at 1799 or via the app.', priority: 'HIGH' });
-  actions.push({ action: 'Ask a Trusted Adult or Teacher', description: "If unsure, talk to a parent or teacher before acting.", priority: 'RECOMMENDED' });
-  const manipTactics = matches.filter(m => [...URGENCY, ...CREDENTIALS, ...REWARDS].some(p => p.label === m.label)).length;
+  if (riskScore > 40)
+    actions.push({
+      action: "Do Not Click Any Links",
+      description: "Links may lead to fraudulent websites.",
+      priority: "CRITICAL",
+    });
+  if (riskScore > 60)
+    actions.push({
+      action: "Do Not Share Personal Information",
+      description: "Never provide passwords, PINs, or OTPs through messages.",
+      priority: "CRITICAL",
+    });
+  actions.push({
+    action: "Verify the Source",
+    description: "Contact the organisation via official channels.",
+    priority: riskScore > 50 ? "HIGH" : "MEDIUM",
+  });
+  if (riskScore > 50)
+    actions.push({
+      action: "Report to ScamShield",
+      description: "Forward to ScamShield at 1799 or via the app.",
+      priority: "HIGH",
+    });
+  actions.push({
+    action: "Ask a Trusted Adult or Teacher",
+    description: "If unsure, talk to a parent or teacher before acting.",
+    priority: "RECOMMENDED",
+  });
+
+  const manipTactics = matches.filter((m) =>
+    [...URGENCY, ...CREDENTIALS, ...REWARDS].some((p) => p.label === m.label),
+  ).length;
+
   return {
-    risk_score: riskScore, threat_level: levelMap(riskScore) as ThreatLevel,
-    classification: clsMap(riskScore), confidence_score: Math.min(99, (riskScore > 70 ? 88 : riskScore > 40 ? 74 : 93) + Math.min(8, positiveMatches.length * 2)),
-    suspicious_elements: elements, red_flags: flags, recommended_actions: actions,
-    analysis_breakdown: { pattern_matches: positiveMatches.length, manipulation_tactics: manipTactics, match_rate_pct: Math.min(99, riskScore + 10) },
+    risk_score: riskScore,
+    threat_level: levelMap(riskScore),
+    classification: clsMap(riskScore),
+    confidence_score: Math.min(
+      99,
+      (riskScore > 70 ? 88 : riskScore > 40 ? 74 : 93) +
+        Math.min(8, positiveMatches.length * 2),
+    ),
+    suspicious_elements: elements,
+    red_flags: flags,
+    recommended_actions: actions,
+    analysis_breakdown: {
+      pattern_matches: positiveMatches.length,
+      manipulation_tactics: manipTactics,
+      match_rate_pct: Math.min(99, riskScore + 10),
+    },
   };
-}
-
-// ── Supabase storage upload for scanner images ───────────────────────────────
-
-async function uploadScannerImage(
-  userId: string, scanId: string, base64: string, mime: string, name: string,
-): Promise<string | null> {
-  if (!supabaseAdmin) return null;
-  try {
-    const ext = name.split('.').pop()?.toLowerCase() ?? mime.split('/')[1] ?? 'jpg';
-    const path = `${userId}/${scanId}.${ext}`;
-    const buffer = Buffer.from(base64, 'base64');
-    const { error } = await supabaseAdmin.storage
-      .from(SCANNER_BUCKET)
-      .upload(path, buffer, { contentType: mime, upsert: false });
-    if (error) { console.warn('[scanner] Storage upload failed:', error.message); return null; }
-    const { data } = supabaseAdmin.storage.from(SCANNER_BUCKET).getPublicUrl(path);
-    return data.publicUrl;
-  } catch (err) {
-    console.warn('[scanner] Storage upload error:', (err as Error).message);
-    return null;
-  }
 }
 
 // ── Core dispatcher ───────────────────────────────────────────────────────────
@@ -352,22 +659,26 @@ async function analyse(input: ScanInput): Promise<ScanAnalysis> {
   const { type, content, imageBase64, imageMime, imageName } = input;
 
   // ── Upload: vision analysis ────────────────────────────────────────────────
-  if (type === 'upload') {
-    if (!imageBase64 || !imageMime) throw new Error('Image data required for upload scan');
+  if (type === "upload") {
+    if (!imageBase64 || !imageMime)
+      throw new Error("Image data required for upload scan");
     if (isGroqEnabled) {
       try {
         const llm = await analyzeWithVision(imageBase64, imageMime);
         return { llm };
       } catch (err) {
-        console.warn('[scanner] Vision failed, falling back to regex:', (err as Error).message);
+        console.warn(
+          "[scanner] Vision failed, falling back to regex:",
+          (err as Error).message,
+        );
       }
     }
-    return { llm: analyzeWithRegex(imageName ?? 'uploaded image') };
+    return { llm: analyzeWithRegex(imageName ?? "uploaded image") };
   }
 
   // ── QR: decode image if provided, then scrape ──────────────────────────────
-  if (type === 'qr') {
-    let urlToScrape = content ?? '';
+  if (type === "qr") {
+    let urlToScrape = content ?? "";
     let decodedQrUrl: string | undefined;
 
     if (imageBase64) {
@@ -377,7 +688,9 @@ async function analyse(input: ScanInput): Promise<ScanAnalysis> {
         urlToScrape = decoded;
         console.log(`[scanner] QR decoded: ${decoded}`);
       } else {
-        console.warn('[scanner] QR decode failed — falling back to content text');
+        console.warn(
+          "[scanner] QR decode failed — falling back to content text",
+        );
       }
     }
 
@@ -385,22 +698,33 @@ async function analyse(input: ScanInput): Promise<ScanAnalysis> {
   }
 
   // ── URL: scrape and analyse ────────────────────────────────────────────────
-  if (type === 'url') {
-    return scrapeAndAnalyse(type, content ?? '');
+  if (type === "url") {
+    return scrapeAndAnalyse(type, content ?? "");
   }
 
   // ── Text: direct LLM / regex analysis ────────────────────────────────────
   if (isGroqEnabled) {
-    try { return { llm: await analyzeWithGroq('text', content ?? '') }; } catch (err) {
-      console.warn('[scanner] Groq failed, falling back to regex:', (err as Error).message);
+    try {
+      return { llm: await analyzeWithGroq("text", content ?? "") };
+    } catch (err) {
+      console.warn(
+        "[scanner] Groq failed, falling back to regex:",
+        (err as Error).message,
+      );
     }
   }
-  return { llm: analyzeWithRegex(content ?? '') };
+  return { llm: analyzeWithRegex(content ?? "") };
 }
 
-async function scrapeAndAnalyse(type: ScanType, url: string, decodedQrUrl?: string): Promise<ScanAnalysis> {
+async function scrapeAndAnalyse(
+  type: ScanType,
+  url: string,
+  decodedQrUrl?: string,
+): Promise<ScanAnalysis> {
   const scrape = await scrapeUrl(url);
-  console.log(`[scanner] scraped ${url} → ${scrape.finalUrl} (${scrape.redirectCount} redirects, status ${scrape.statusCode})`);
+  console.log(
+    `[scanner] scraped ${url} → ${scrape.finalUrl} (${scrape.redirectCount} redirects, status ${scrape.statusCode})`,
+  );
 
   const urlMeta: UrlMetadata = {
     final_url: scrape.finalUrl,
@@ -414,41 +738,98 @@ async function scrapeAndAnalyse(type: ScanType, url: string, decodedQrUrl?: stri
   let llm: LLMAnalysis;
   if (isGroqEnabled) {
     try {
-      const prompt = buildUrlPrompt(url, urlMeta, scrape.pageText, scrape.pageTitle, scrape.metaDescription);
+      const prompt = buildUrlPrompt(
+        url,
+        urlMeta,
+        scrape.pageText,
+        scrape.pageTitle,
+        scrape.metaDescription,
+      );
       llm = await analyzeWithGroq(type, prompt);
     } catch (err) {
-      console.warn('[scanner] Groq failed, falling back to regex:', (err as Error).message);
-      llm = analyzeWithRegex(url + ' ' + scrape.pageTitle + ' ' + scrape.pageText);
+      console.warn(
+        "[scanner] Groq failed, falling back to regex:",
+        (err as Error).message,
+      );
+      llm = analyzeWithRegex(
+        url + " " + scrape.pageTitle + " " + scrape.pageText,
+      );
     }
   } else {
-    llm = analyzeWithRegex(url + ' ' + scrape.pageTitle + ' ' + scrape.pageText);
+    llm = analyzeWithRegex(
+      url + " " + scrape.pageTitle + " " + scrape.pageText,
+    );
   }
 
   // If scrape failed to get the URL at all, add that as a signal
   if (scrape.error && llm.risk_score < 30) {
-    llm.suspicious_elements.push({ element: 'URL unreachable', location: 'URL', severity: 'MEDIUM', description: scrape.error });
+    llm.suspicious_elements.push({
+      element: "URL unreachable",
+      location: "URL",
+      severity: "MEDIUM",
+      description: scrape.error,
+    });
     llm.risk_score = Math.min(100, llm.risk_score + 20);
   }
 
-  return { llm, urlMeta, decodedQrUrl, pageTitle: scrape.pageTitle, pageMetaDesc: scrape.metaDescription, pageText: scrape.pageText };
+  return {
+    llm,
+    urlMeta,
+    decodedQrUrl,
+    pageTitle: scrape.pageTitle,
+    pageMetaDesc: scrape.metaDescription,
+    pageText: scrape.pageText,
+  };
+}
+
+export async function analyseScanPreview(
+  type: ScanType,
+  content: string,
+): Promise<LLMAnalysis> {
+  const analysis = await analyse({ type, content });
+  return analysis.llm;
 }
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
 const MOCK_HISTORY: ScanHistoryItem[] = [
-  { scan_id: 'mock-1', type: 'text', content_preview: 'BREAKING: Free iPhone giveaway! Click now...', risk_score: 92, classification: 'Scam', scanned_at: new Date(Date.now() - 7200000).toISOString() },
-  { scan_id: 'mock-2', type: 'url',  content_preview: 'gov.sg/digital-safety-tips', risk_score: 5, classification: 'Safe', scanned_at: new Date(Date.now() - 86400000).toISOString() },
-  { scan_id: 'mock-3', type: 'text', content_preview: 'Suspicious WhatsApp message about account', risk_score: 67, classification: 'Suspicious', scanned_at: new Date(Date.now() - 172800000).toISOString() },
+  {
+    scan_id: "mock-1",
+    type: "text",
+    content_preview: "BREAKING: Free iPhone giveaway! Click now...",
+    risk_score: 92,
+    classification: "Scam",
+    scanned_at: new Date(Date.now() - 7200000).toISOString(),
+  },
+  {
+    scan_id: "mock-2",
+    type: "url",
+    content_preview: "gov.sg/digital-safety-tips",
+    risk_score: 5,
+    classification: "Safe",
+    scanned_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    scan_id: "mock-3",
+    type: "text",
+    content_preview: "Suspicious WhatsApp message about account",
+    risk_score: 67,
+    classification: "Suspicious",
+    scanned_at: new Date(Date.now() - 172800000).toISOString(),
+  },
 ];
-const MOCK_STATS: ScannerStats = { total_scans: 47, threats_found: 12, safe_count: 35, xp_earned: 1175 };
+
+const MOCK_STATS: ScannerStats = {
+  total_scans: 47,
+  threats_found: 12,
+  safe_count: 35,
+  xp_earned: 1175,
+};
 
 // ── Service ────────────────────────────────────────────────────────────────────
 
 export const scannerService = {
-  async scan(
-    userId: string,
-    input: ScanInput,
-  ): Promise<ScanResult> {
+  async scan(userId: string, input: ScanInput): Promise<ScanResult> {
     const { type, content, imageBase64, imageMime, imageName } = input;
     const scannedAt = new Date().toISOString();
 
@@ -457,15 +838,18 @@ export const scannerService = {
 
     // Build content preview
     let preview: string;
-    if (type === 'upload') {
-      preview = imageName ? `Image: ${imageName}` : 'Uploaded image';
-    } else if (type === 'url' || type === 'qr') {
-      const displayUrl = decodedQrUrl ?? content ?? '';
+    if (type === "upload") {
+      preview = imageName ? `Image: ${imageName}` : "Uploaded image";
+    } else if (type === "url" || type === "qr") {
+      const displayUrl = decodedQrUrl ?? content ?? "";
       const finalUrl = urlMeta?.final_url ?? displayUrl;
       const label = decodedQrUrl ? `QR → ${finalUrl}` : finalUrl;
-      preview = label.length > 80 ? label.slice(0, 77) + '...' : label;
+      preview = label.length > 80 ? label.slice(0, 77) + "..." : label;
     } else {
-      preview = (content ?? '').length > 80 ? (content ?? '').slice(0, 77) + '...' : (content ?? '');
+      preview =
+        (content ?? "").length > 80
+          ? (content ?? "").slice(0, 77) + "..."
+          : (content ?? "");
     }
 
     const isThreat = llm.risk_score > 50;
@@ -473,39 +857,39 @@ export const scannerService = {
 
     if (isMockMode) {
       return {
-        scan_id: `scan-${Date.now()}`, type, content_preview: preview,
-        ...llm, xp_awarded: xpAwarded, newly_earned_badges: [], scanned_at: scannedAt,
-        url_metadata: urlMeta, decoded_qr_url: decodedQrUrl,
+        scan_id: `scan-${Date.now()}`,
+        type,
+        content_preview: preview,
+        ...llm,
+        xp_awarded: xpAwarded,
+        newly_earned_badges: [],
+        scanned_at: scannedAt,
       };
     }
 
-    // Store image if provided (upload or qr)
-    let imageUrl: string | undefined;
-    if (imageBase64 && imageMime && (type === 'upload' || type === 'qr')) {
-      const tempId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const stored = await uploadScannerImage(userId, tempId, imageBase64, imageMime, imageName ?? 'scan.jpg');
-      if (stored) imageUrl = stored;
-    }
-
     const { data: row, error: insertErr } = await supabaseAdmin!
-      .from('scan_history')
+      .from("scan_history")
       .insert({
-        user_id: userId, type, content_preview: preview,
-        risk_score: llm.risk_score, classification: llm.classification,
-        threat_level: llm.threat_level, confidence_score: llm.confidence_score,
+        user_id: userId,
+        type,
+        content_preview: preview,
+        risk_score: llm.risk_score,
+        classification: llm.classification,
+        threat_level: llm.threat_level,
+        confidence_score: llm.confidence_score,
         result_data: {
           suspicious_elements: llm.suspicious_elements,
           red_flags: llm.red_flags,
           recommended_actions: llm.recommended_actions,
           analysis_breakdown: llm.analysis_breakdown,
           url_metadata: urlMeta,
-          image_url: imageUrl,
+          image_url: imageBase64 ?? imageName ?? undefined,
           decoded_qr_url: decodedQrUrl,
         },
         xp_awarded: xpAwarded,
         scanned_at: scannedAt,
       })
-      .select('id')
+      .select("id")
       .single();
 
     if (insertErr) throw new Error(`scan insert: ${insertErr.message}`);
@@ -513,42 +897,59 @@ export const scannerService = {
     await usersService.awardXp(userId, { amount: xpAwarded });
 
     const newlyEarnedBadges: string[] = [];
-    if (isThreat && await badgesService.awardBadge(userId, 'scam-slayer')) newlyEarnedBadges.push('scam-slayer');
-    if ((type === 'url' || type === 'qr') && await badgesService.awardBadge(userId, 'qr-guardian')) newlyEarnedBadges.push('qr-guardian');
+    if (isThreat && (await badgesService.awardBadge(userId, "scam-slayer")))
+      newlyEarnedBadges.push("scam-slayer");
+    if (
+      (type === "url" || type === "qr") &&
+      (await badgesService.awardBadge(userId, "qr-guardian"))
+    )
+      newlyEarnedBadges.push("qr-guardian");
 
     return {
-      scan_id: row.id, type, content_preview: preview,
-      ...llm, xp_awarded: xpAwarded, newly_earned_badges: newlyEarnedBadges, scanned_at: scannedAt,
-      url_metadata: urlMeta, image_url: imageUrl, decoded_qr_url: decodedQrUrl,
+      scan_id: row.id,
+      type,
+      content_preview: preview,
+      ...llm,
+      xp_awarded: xpAwarded,
+      newly_earned_badges: newlyEarnedBadges,
+      scanned_at: scannedAt,
     };
   },
 
   async getHistory(userId: string): Promise<ScanHistoryItem[]> {
     if (isMockMode) return MOCK_HISTORY;
     const { data, error } = await supabaseAdmin!
-      .from('scan_history')
-      .select('id, type, content_preview, risk_score, classification, scanned_at')
-      .eq('user_id', userId)
-      .order('scanned_at', { ascending: false })
+      .from("scan_history")
+      .select(
+        "id, type, content_preview, risk_score, classification, scanned_at",
+      )
+      .eq("user_id", userId)
+      .order("scanned_at", { ascending: false })
       .limit(10);
     if (error) throw new Error(`getHistory: ${error.message}`);
-    return (data ?? []).map(r => ({
-      scan_id: r.id, type: r.type as ScanType, content_preview: r.content_preview,
-      risk_score: r.risk_score, classification: r.classification, scanned_at: r.scanned_at,
+    return (data ?? []).map((r) => ({
+      scan_id: r.id,
+      type: r.type,
+      content_preview: r.content_preview,
+      risk_score: r.risk_score,
+      classification: r.classification,
+      scanned_at: r.scanned_at,
     }));
   },
 
   async getStats(userId: string): Promise<ScannerStats> {
     if (isMockMode) return MOCK_STATS;
     const { data, error } = await supabaseAdmin!
-      .from('scan_history')
-      .select('risk_score, xp_awarded')
-      .eq('user_id', userId);
+      .from("scan_history")
+      .select("risk_score, xp_awarded")
+      .eq("user_id", userId);
+
     if (error) throw new Error(`getStats: ${error.message}`);
     const rows = data ?? [];
     return {
-      total_scans: rows.length, threats_found: rows.filter(r => r.risk_score > 50).length,
-      safe_count: rows.filter(r => r.risk_score <= 50).length,
+      total_scans: rows.length,
+      threats_found: rows.filter((r) => r.risk_score > 50).length,
+      safe_count: rows.filter((r) => r.risk_score <= 50).length,
       xp_earned: rows.reduce((s, r) => s + (r.xp_awarded ?? 0), 0),
     };
   },

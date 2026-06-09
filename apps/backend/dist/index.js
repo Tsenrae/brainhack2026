@@ -10,20 +10,16 @@ import { squadsRouter } from './routes/squads.routes.js';
 import { reportsRouter } from './routes/reports.routes.js';
 import { scenariosRouter } from './routes/scenarios.routes.js';
 import { telegramRouter } from './routes/telegram.routes.js';
-
 const app = express();
 const PORT = Number(process.env.PORT ?? 5000);
-
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
-  credentials: true,
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    credentials: true,
 }));
 app.use(express.json());
-
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'brainhack-backend', mock: process.env.MOCK_MODE === 'true' });
+    res.json({ status: 'ok', service: 'brainhack-backend', mock: process.env.MOCK_MODE === 'true' });
 });
-
 app.use('/api/users', usersRouter);
 app.use('/api/missions', missionsRouter);
 app.use('/api/badges', badgesRouter);
@@ -33,12 +29,10 @@ app.use('/api/squads', squadsRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/scenarios', scenariosRouter);
 app.use('/api/integrations/telegram', telegramRouter);
-
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
-  res.status(500).json({ error: err.message ?? 'Internal server error' });
+app.use((err, _req, res, _next) => {
+    console.error(err);
+    res.status(500).json({ error: err.message ?? 'Internal server error' });
 });
-
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+    console.log(`Backend running on http://localhost:${PORT}`);
 });
