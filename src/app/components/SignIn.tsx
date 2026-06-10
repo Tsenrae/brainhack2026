@@ -22,7 +22,7 @@ export function SignIn() {
     setLoading(true);
     try {
       await signInWithEmail(email, password);
-      navigate('/dashboard');
+      // Navigation is handled by AuthContext once the profile is confirmed loaded
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign-in failed. Please check your credentials.');
     } finally {

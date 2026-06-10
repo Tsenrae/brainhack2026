@@ -77,18 +77,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
 
+// Returns null only on 404 (no profile). Throws on network/server errors
+// so callers can distinguish "user has no profile" from "backend unreachable".
 async function fetchProfileFromBackend(token: string): Promise<UserProfile | null> {
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/users/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) return null;
-    const { data } = await res.json();
-    return data as UserProfile;
-  } catch {
-    return null;
-  }
+  const res = await fetch(`${BACKEND_URL}/api/users/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`profile fetch failed: ${res.status}`);
+  const { data } = await res.json();
+  return data as UserProfile;
 }
 
 async function fetchMissionStatusFromBackend(token: string): Promise<MissionStatusResponse | null> {
@@ -130,19 +128,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function hydrateSessionData(activeSession: Session, event?: string): Promise<void> {
     setMissionLoading(true);
 
-    const [profileResult, missionResult] = await Promise.all([
-      fetchProfileFromBackend(activeSession.access_token),
+    let profileResult: UserProfile | null = null;
+    let profileMissing = false;
+
+    const [missionResult] = await Promise.all([
       fetchMissionStatusFromBackend(activeSession.access_token),
+      fetchProfileFromBackend(activeSession.access_token)
+        .then(p  => { profileResult = p; profileMissing = p === null; })
+        .catch(() => { /* backend unreachable — keep profileResult null but don't treat as missing */ }),
     ]);
 
     setProfile(profileResult);
     setMissionStatus(missionResult);
     setMissionLoading(false);
 
-    if (profileResult === null && event === 'SIGNED_IN' && !window.location.pathname.includes('/signup')) {
-      window.location.href = '/signup?complete=1';
+    if (event === 'SIGNED_IN') {
+      if (profileMissing && !window.location.pathname.includes('/signup')) {
+        // Definitive 404 — account exists in auth but has no profile row yet
+        window.location.href = '/signup?complete=1';
+      } else if (!window.location.pathname.startsWith('/dashboard')) {
+        // Profile loaded (or backend unreachable) — always proceed to dashboard
+        window.location.href = '/dashboard';
+      }
     } else {
-      setNeedsProfile(profileResult === null);
+      setNeedsProfile(profileMissing);
     }
   }
 

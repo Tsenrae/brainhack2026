@@ -4,9 +4,12 @@ services:
       context: ./apps/backend
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5001:5000"
     env_file:
       - ./apps/backend/.env
+    environment:
+      # Override FRONTEND_URL so Docker nginx (port 80) passes CORS
+      FRONTEND_URL: "http://localhost,http://localhost:5173"
     restart: unless-stopped
 
   frontend:
@@ -16,7 +19,7 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:5000}
+        VITE_BACKEND_URL: "http://localhost:5001"
     ports:
       - "80:80"
     depends_on:
