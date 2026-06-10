@@ -616,7 +616,7 @@ export function GuardianHeatmap() {
                             hs.percentage > 15 ? 'bg-gradient-to-r from-orange-500 to-yellow-500' :
                             'bg-gradient-to-r from-yellow-500 to-green-500'
                           }`}
-                          style={{ width: `${Math.max(hs.percentage * 3, 4)}%` }}
+                          style={{ width: hs.count > 0 ? `${Math.max(hs.percentage, 4)}%` : '0%' }}
                         />
                       </div>
                       <div className="w-24 text-right">
