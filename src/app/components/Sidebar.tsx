@@ -43,7 +43,7 @@ export function Sidebar() {
     <aside className="w-64 h-screen bg-white border-r border-gray-200 flex flex-col sticky top-0">
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link to="/dashboard" className="flex items-center gap-3 group">
           <div className="bg-red-600 w-10 h-10 rounded-xl flex items-center justify-center">
             <Shield className="w-6 h-6 text-white" />
           </div>
