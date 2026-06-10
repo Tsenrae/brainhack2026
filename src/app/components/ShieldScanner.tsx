@@ -31,6 +31,8 @@ const DEMO_CONTENT = {
 };
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:5000';
+const MAX_SCAN_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_SCAN_IMAGE_MB = MAX_SCAN_IMAGE_BYTES / (1024 * 1024);
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -100,7 +102,7 @@ export function ShieldScanner() {
   function selectUploadFile(file: File | null) {
     if (!file) return;
     if (!file.type.startsWith('image/')) { setScanError('Please select an image file.'); return; }
-    if (file.size > 12 * 1024 * 1024)   { setScanError('File must be under 12 MB.'); return; }
+    if (file.size > MAX_SCAN_IMAGE_BYTES) { setScanError(`File must be under ${MAX_SCAN_IMAGE_MB} MB.`); return; }
     setScanError(null);
     setUploadFile(file);
     setUploadPreview(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file); });
@@ -109,7 +111,7 @@ export function ShieldScanner() {
   function selectQrFile(file: File | null) {
     if (!file) return;
     if (!file.type.startsWith('image/')) { setScanError('Please select an image file.'); return; }
-    if (file.size > 12 * 1024 * 1024)   { setScanError('File must be under 12 MB.'); return; }
+    if (file.size > MAX_SCAN_IMAGE_BYTES) { setScanError(`File must be under ${MAX_SCAN_IMAGE_MB} MB.`); return; }
     setScanError(null);
     setQrFile(file);
     setQrPreview(prev => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(file); });
@@ -327,7 +329,7 @@ export function ShieldScanner() {
                   <p className="text-gray-700 font-medium mb-2">Drag & drop your screenshot here</p>
                   <p className="text-sm text-gray-500 mb-4">or click to browse</p>
                   <span className="px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-xl">Choose Image</span>
-                  <p className="text-xs text-gray-400 mt-4">PNG, JPG, WEBP — max 12 MB</p>
+                  <p className="text-xs text-gray-400 mt-4">PNG, JPG, WEBP — max {MAX_SCAN_IMAGE_MB} MB</p>
                 </div>
               )}
 

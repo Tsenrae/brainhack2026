@@ -15,7 +15,7 @@ async function extractAuth(req: Request, res: Response): Promise<AuthPayload | n
   return { userId: user.id, email: user.email ?? '' };
 }
 
-const MAX_IMAGE_B64 = 15 * 1024 * 1024; // ~15 MB encoded
+const MAX_IMAGE_B64 = 20 * 1024 * 1024; // Supports 12 MB image files after base64 encoding.
 
 const scanSchema = z.object({
   type:           z.enum(['text', 'url', 'qr', 'upload']),
