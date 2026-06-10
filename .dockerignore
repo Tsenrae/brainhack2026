@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+.env.*
+
+# Backend lives in its own build context — not needed here
+apps/
+
+# Large non-build directories
+guidelines/
+video-scripts/
+.git
+
+# Docs
+*.md
